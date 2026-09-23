@@ -19,6 +19,8 @@ state, because it creates the backend everything else uses.
 | Role assignment: Storage Blob Data Contributor | Owner is a control-plane role and can't read blobs through Entra ID. This data-plane role is scoped to the one container. |
 | `prevent_destroy` on the account and container | `terraform destroy` fails instead of orphaning every environment's state. |
 | Consumption budget (optional) | Emails at 50/80/100% actual and 100% forecast spend. Budgets are free. |
+| Guardrail policies `deny-state-shared-key`, `deny-state-open-network` | Built-in Deny policies on this resource group: nobody (CI, the firewall script, the portal) can turn Shared Key back on or set the firewall to Allow. `state_guardrail_effect` switches them to Audit. |
+| Plan identity `id-hubspoke-github-plan` (optional, `github_repository`) | Managed identity with a federated credential for this repository's `pull_request` tokens. Reader on the subscription, Blob Data Reader on the container, and a custom role to edit this account's firewall for the length of a CI job. See [ADR 0009](../../docs/decisions/0009-pull-request-plans-with-oidc.md). |
 
 Locking uses **native blob leases**. `terraform plan` and `apply` take a lease
 on the state blob and release it at the end, so no second resource is needed.
@@ -85,10 +87,17 @@ account name from it (or from `STATE_ACCOUNT` / `STATE_RESOURCE_GROUP`).
 | Name | Type |
 | ---- | ---- |
 | [azurerm_consumption_budget_subscription.monthly](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/consumption_budget_subscription) | resource |
+| [azurerm_federated_identity_credential.github_pull_request](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential) | resource |
 | [azurerm_resource_group.state](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
+| [azurerm_resource_group_policy_assignment.state_guardrails](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group_policy_assignment) | resource |
+| [azurerm_role_assignment.github_plan_reader](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_role_assignment.github_plan_state_firewall](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_role_assignment.github_plan_state_reader](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.state_blob_contributor](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_role_definition.state_firewall_operator](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_definition) | resource |
 | [azurerm_storage_account.state](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account) | resource |
 | [azurerm_storage_container.state](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_container) | resource |
+| [azurerm_user_assigned_identity.github_plan](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity) | resource |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
 
 ## Inputs
@@ -99,10 +108,12 @@ account name from it (or from `STATE_ACCOUNT` / `STATE_RESOURCE_GROUP`).
 | owner | Value for the Owner tag, e.g. your GitHub handle. | `string` | n/a | yes |
 | subscription\_id | Azure subscription that holds the state account. Get it with: az account show --query id -o tsv | `string` | n/a | yes |
 | budget\_alert\_email | Email address for budget alerts. Leave null to skip creating the budget. | `string` | `null` | no |
+| github\_repository | GitHub repository (owner/name) whose pull\_request workflows may use the read-only plan identity. Leave null to create no identity. | `string` | `null` | no |
 | location | Azure region for the state account. Use the same region as the environments. | `string` | `"germanywestcentral"` | no |
 | monthly\_budget\_amount | Monthly subscription budget, in the subscription's billing currency. Alerts fire at 50/80/100% actual and 100% forecast. | `number` | `20` | no |
 | project | Short project name. Used in the resource group name and the Project tag. | `string` | `"hubspoke"` | no |
 | soft\_delete\_retention\_days | Days a deleted state blob, blob version or container can still be restored. | `number` | `30` | no |
+| state\_guardrail\_effect | Effect of the built-in policies that keep the state account on Shared Key off and firewall default-Deny. Audit reports violations without blocking them. | `string` | `"Deny"` | no |
 
 ## Outputs
 
@@ -111,7 +122,9 @@ account name from it (or from `STATE_ACCOUNT` / `STATE_RESOURCE_GROUP`).
 | backend\_config | Partial backend config for azure/envs/*. Write it with: terraform output -raw backend\_config > ../envs/dev/backend.hcl |
 | budget\_name | Name of the monthly budget, or null if no alert email was given. |
 | container\_name | Blob container that holds the state files. |
+| github\_plan\_client\_id | Client ID of the plan identity (AZURE\_CLIENT\_ID secret), or null when github\_repository isn't set. |
 | resource\_group\_name | Resource group that holds the state account. |
 | storage\_account\_id | Resource ID of the state account, for role assignments that grant state access. |
 | storage\_account\_name | Name of the storage account that stores Terraform state. |
+| tenant\_id | Entra tenant ID (AZURE\_TENANT\_ID secret). |
 <!-- END_TF_DOCS -->

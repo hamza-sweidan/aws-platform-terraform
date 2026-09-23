@@ -161,3 +161,23 @@ terraform force-unlock <LOCK_ID>     # ID from the error message
 # If that fails, break the lease directly (Entra ID auth):
 az storage blob lease break --account-name "$SA" -c tfstate -b envs/dev/terraform.tfstate --auth-mode login
 ```
+
+---
+
+## 8. Pull request plan (CI) fails
+
+The `terraform-plan` workflow's Azure job logs in as the
+`id-hubspoke-github-plan` managed identity through GitHub OIDC, lets the
+runner's IP through the state firewall, plans, and removes the IP again
+([ADR 0009](decisions/0009-pull-request-plans-with-oidc.md)).
+
+| Error in the job log | Cause | Fix |
+|---|---|---|
+| `AADSTS70021` / `AADSTS700213`: no matching federated identity record | The token's subject isn't `repo:<owner>/<repo>:pull_request`: wrong trigger, fork, or renamed repository. | Check `github_repository` in `azure/bootstrap/terraform.tfvars`, apply bootstrap. |
+| `AuthorizationFailed` on `storageAccounts/write` in the firewall step | The custom firewall role isn't assigned yet, or RBAC hasn't propagated (minutes after bootstrap). | Re-run the job; check `az role assignment list --assignee <client id> --all`. |
+| `RequestDisallowedByPolicy` in the firewall step, naming `deny-state-*` | The guardrail policy rejected the network-rule update. That only happens if the request would weaken the account, or if Azure evaluated the partial update on its own. | Run `scripts/azure-state-firewall.sh status`. If the account is healthy, set `state_guardrail_effect = "Audit"` in `azure/bootstrap` and apply. |
+| `terraform init` retries, then `AuthorizationFailure` (403) | The new firewall rule hadn't reached the storage front ends within ~2 minutes. | Re-run the job. |
+| Plan fails with `AuthorizationFailed` on a resource read | The identity's Reader assignment is missing or still propagating. | Same as above; Reader is on the whole subscription. |
+
+A job killed before its last step leaves its runner IP in the firewall. Clean
+up with `scripts/azure-state-firewall.sh reset` (keeps only your current IP).

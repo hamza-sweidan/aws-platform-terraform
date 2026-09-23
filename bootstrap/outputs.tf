@@ -25,3 +25,8 @@ output "budget_name" {
   description = "Name of the monthly cost budget, or null if no alert email was given."
   value       = one(aws_budgets_budget.monthly[*].name)
 }
+
+output "github_plan_role_arn" {
+  description = "Role for terraform plan in GitHub Actions (AWS_PLAN_ROLE_ARN secret), or null when github_repository isn't set."
+  value       = one(aws_iam_role.github_plan[*].arn)
+}

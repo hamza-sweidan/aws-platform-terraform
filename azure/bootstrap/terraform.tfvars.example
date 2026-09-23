@@ -11,3 +11,6 @@ allowed_ip_ranges = ["203.0.113.10"]
 # location              = "germanywestcentral"
 # monthly_budget_amount = 20
 budget_alert_email = "you@example.com"
+
+# Read-only plan identity for pull requests (.github/workflows/terraform-plan.yml)
+# github_repository = "your-github-handle/aws-platform-terraform"
