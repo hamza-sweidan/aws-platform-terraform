@@ -265,6 +265,41 @@ runs on every pull request to `main`:
 
 Actions are pinned to commit SHAs, and the workflow token is `contents: read`.
 
+### Plans on pull requests
+
+[`.github/workflows/terraform-plan.yml`](.github/workflows/terraform-plan.yml)
+runs `terraform plan` for `envs/dev` and `azure/envs/dev` against the real
+accounts on every pull request, with **short-lived OIDC credentials** and no
+stored secret key ([ADR 0009](docs/decisions/0009-pull-request-plans-with-oidc.md)):
+
+- The identities are read-only: an IAM role in `bootstrap/` and a managed
+  identity in `azure/bootstrap/`. Each trusts only this repository's
+  `pull_request` tokens.
+- Plans run with `-lock=false`. The job summary shows the `Plan:` line and
+  each changed resource's address and action. The full plan, with account
+  IDs and ARNs, never reaches this public repository's logs.
+- The Azure job lets its runner IP through the state firewall for the length
+  of the job. Two built-in Deny policies keep that write from weakening the
+  account.
+
+Both jobs stay off until the identities exist. One-time setup, after
+applying both bootstraps with `github_repository` set:
+
+```bash
+gh variable set OWNER --body "<your-github-handle>"
+
+gh secret set AWS_PLAN_ROLE_ARN --body "$(terraform -chdir=bootstrap output -raw github_plan_role_arn)"
+gh secret set AWS_STATE_BUCKET --body "$(terraform -chdir=bootstrap output -raw state_bucket_name)"
+gh secret set AWS_CLUSTER_ADMIN_ARNS --body '["arn:aws:iam::111122223333:user/your-user"]'
+gh variable set AWS_PLAN_ENABLED --body true
+
+gh secret set AZURE_CLIENT_ID --body "$(terraform -chdir=azure/bootstrap output -raw github_plan_client_id)"
+gh secret set AZURE_TENANT_ID --body "$(terraform -chdir=azure/bootstrap output -raw tenant_id)"
+gh secret set AZURE_SUBSCRIPTION_ID --body "$(az account show --query id -o tsv)"
+gh secret set AZURE_STATE_ACCOUNT --body "$(terraform -chdir=azure/bootstrap output -raw storage_account_name)"
+gh variable set AZURE_PLAN_ENABLED --body true
+```
+
 ### Tests
 
 Every module and both environments have offline `terraform test` suites
@@ -307,6 +342,7 @@ pip install pre-commit && pre-commit install
 - [0006: Default-deny NSG baseline and private subnets](docs/decisions/0006-default-deny-nsg-baseline.md)
 - [0007: Required tags with an Azure Policy Deny at resource-group scope](docs/decisions/0007-tag-policy-deny-at-resource-group-scope.md)
 - [0008: Azure state with Entra ID-only access](docs/decisions/0008-azure-state-entra-id-only.md)
+- [0009: Pull request plans with OIDC and read-only identities](docs/decisions/0009-pull-request-plans-with-oidc.md)
 
 ## Phase 2: Azure
 

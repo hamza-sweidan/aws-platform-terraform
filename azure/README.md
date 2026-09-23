@@ -228,3 +228,4 @@ Fixed rather than skipped: CKV_AZURE_206 (replication raised from ZRS to GZRS).
 - [0006: Default-deny NSG baseline and private subnets](../docs/decisions/0006-default-deny-nsg-baseline.md)
 - [0007: Required tags with an Azure Policy Deny at resource-group scope](../docs/decisions/0007-tag-policy-deny-at-resource-group-scope.md)
 - [0008: Azure state with Entra ID-only access](../docs/decisions/0008-azure-state-entra-id-only.md)
+- [0009: Pull request plans with OIDC and read-only identities](../docs/decisions/0009-pull-request-plans-with-oidc.md)
