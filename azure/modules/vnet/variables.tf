@@ -33,7 +33,9 @@ variable "subnets" {
     Subnets keyed by short name (snet-<key>). Every subnet gets its own NSG with
     the module's baseline rules (see README) plus the rules given here. For each
     rule, remote_address_prefixes is the source of an Inbound rule and the
-    destination of an Outbound rule; the other side is always this subnet.
+    destination of an Outbound rule. The other side is this subnet, unless
+    local_address_prefixes overrides it (e.g. to include an AKS overlay pod
+    CIDR, whose addresses live outside the subnet).
   EOT
   type = map(object({
     address_prefix = string
@@ -43,6 +45,7 @@ variable "subnets" {
       access                  = optional(string, "Allow")
       protocol                = string
       remote_address_prefixes = list(string)
+      local_address_prefixes  = optional(list(string))
       destination_port_ranges = list(string)
       description             = optional(string, "")
     })), {})
@@ -84,12 +87,14 @@ variable "subnets" {
     # singular prefix field, so a list must be plain CIDRs.
     condition = alltrue(flatten([
       for s in values(var.subnets) : [
-        for r in values(s.nsg_rules) :
-        length(r.remote_address_prefixes) == 1 ||
-        (length(r.remote_address_prefixes) > 1 && alltrue([for p in r.remote_address_prefixes : can(cidrhost(p, 0))]))
+        for r in values(s.nsg_rules) : [
+          for prefixes in [r.remote_address_prefixes, coalesce(r.local_address_prefixes, [s.address_prefix])] :
+          length(prefixes) == 1 ||
+          (length(prefixes) > 1 && alltrue([for p in prefixes : can(cidrhost(p, 0))]))
+        ]
       ]
     ]))
-    error_message = "remote_address_prefixes must be one CIDR or service tag, or several CIDRs (service tags can't be mixed into a list)."
+    error_message = "remote_address_prefixes and local_address_prefixes must each be one CIDR or service tag, or several CIDRs (service tags can't be mixed into a list)."
   }
 
   validation {
