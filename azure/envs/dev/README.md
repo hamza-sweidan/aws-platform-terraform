@@ -41,6 +41,29 @@ tag policy (Deny, Indexed) assigned to all three resource groups
 | spoke1 ↔ spoke2 | nothing | no route (non-transitive peering) **and** `DenyVnetInBound` |
 | any subnet → internet | nothing | private subnets (no default outbound access) **and** `DenyInternetOutBound` |
 
+## Phase 3: private AKS (`enable_aks`)
+
+Off by default. With `enable_aks = true` (about $0.18/h with 2 nodes) the
+environment adds, in `aks.tf`:
+
+- **AKS spoke** `vnet-hubspoke-aks-dev` 10.13.0.0/22, peered to the hub. The
+  first /24 holds the nodes, the API server private endpoint and the ACR
+  private endpoint. Its NSG adds `AllowClusterTraffic{In,Out}Bound` for the
+  node subnet plus the overlay pod CIDR 10.244.0.0/16: pod-to-pod traffic
+  between nodes keeps pod IPs, which the default-deny baseline would drop.
+- **Private ACR** (`modules/acr-private`) with the `aks-managed-mcr` cache
+  rule the cluster bootstraps from.
+- **Network-isolated private AKS** (`modules/aks`): `outbound_type = none`,
+  private API, Entra ID only, CNI Overlay + Cilium, 2 × B2als_v2.
+- The hub's DNS rule and the tag policy extend to the new spoke and resource
+  group automatically.
+
+The registry depends on the tag policy, because the policy has to exempt the
+private endpoint's untagged NIC before the endpoint is created.
+
+`terraform output -raw aks_verify_commands` prints the checks and the offline
+demo (run through `az aks command invoke`).
+
 ## Usage
 
 ```bash
@@ -79,6 +102,10 @@ See the [Azure README](../../README.md) for verification and teardown.
 
 | Name | Source | Version |
 | ---- | ------ | ------- |
+| acr | ../../modules/acr-private | n/a |
+| aks | ../../modules/aks | n/a |
+| aks\_peering | ../../modules/vnet-peering | n/a |
+| aks\_spoke | ../../modules/vnet | n/a |
 | hub | ../../modules/vnet | n/a |
 | peering | ../../modules/vnet-peering | n/a |
 | spoke | ../../modules/vnet | n/a |
@@ -88,8 +115,10 @@ See the [Azure README](../../README.md) for verification and teardown.
 
 | Name | Type |
 | ---- | ---- |
+| [azurerm_resource_group.aks](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
 | [azurerm_resource_group.hub](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
 | [azurerm_resource_group.spoke](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
+| [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
 
 ## Inputs
 
@@ -97,6 +126,11 @@ See the [Azure README](../../README.md) for verification and teardown.
 | ---- | ----------- | ---- | ------- | :------: |
 | owner | Owner tag value, e.g. your GitHub handle or team. | `string` | n/a | yes |
 | subscription\_id | Azure subscription to deploy into. Get it with: az account show --query id -o tsv | `string` | n/a | yes |
+| aks\_address\_space | AKS spoke VNet CIDR. The first /24 holds the nodes and the private endpoints (pods use the overlay CIDR, not the VNet). | `string` | `"10.13.0.0/22"` | no |
+| aks\_admin\_object\_ids | Entra object IDs given AKS RBAC Cluster Admin. Empty means the identity running Terraform. | `list(string)` | `[]` | no |
+| aks\_kubernetes\_version | AKS Kubernetes minor version (the region's default when pinned). | `string` | `"1.35"` | no |
+| aks\_node\_count | AKS nodes (Standard\_B2als\_v2, 2 vCPU each). Two use a Free Trial's whole 4-vCPU regional quota. | `number` | `2` | no |
+| enable\_aks | Create the Phase 3 private AKS spoke: network-isolated cluster, private ACR, peering (~$0.18/h with 2 nodes while it exists). | `bool` | `false` | no |
 | environment | Environment name, used in resource names and the Environment tag. | `string` | `"dev"` | no |
 | hub\_address\_space | Hub VNet CIDR. The first /24 is reserved for Azure Firewall, Bastion and gateway subnets; the second holds shared services. | `string` | `"10.10.0.0/22"` | no |
 | location | Azure region for every resource. | `string` | `"germanywestcentral"` | no |
@@ -108,7 +142,12 @@ See the [Azure README](../../README.md) for verification and teardown.
 
 | Name | Description |
 | ---- | ----------- |
+| acr\_login\_server | Private registry login server, or null. |
+| acr\_name | Private registry name, or null. |
 | address\_plan | VNet and subnet CIDRs, by VNet and subnet key. |
+| aks\_cluster\_name | AKS cluster name, or null when enable\_aks = false. |
+| aks\_resource\_group\_name | Resource group of the AKS cluster, registry and identities, or null. |
+| aks\_verify\_commands | az commands (bash) that check the AKS cluster and run the offline demo through az aks command invoke. |
 | hub\_vnet\_id | Hub VNet ID. |
 | location | Azure region. |
 | network\_security\_group\_ids | NSG IDs by VNet key, then subnet key. |

@@ -26,8 +26,16 @@ provider "azurerm" {
   subscription_id = var.subscription_id
 
   # azurerm 5.0 registers no Resource Providers by default. Network for the
-  # VNets and NSGs; PolicyInsights so policy compliance results are recorded.
-  resource_providers_to_register = ["Microsoft.Network", "Microsoft.PolicyInsights"]
+  # VNets and NSGs; PolicyInsights so policy compliance results are recorded;
+  # the rest for the optional AKS spoke (enable_aks).
+  resource_providers_to_register = [
+    "Microsoft.Network",
+    "Microsoft.PolicyInsights",
+    "Microsoft.ContainerService",
+    "Microsoft.ContainerRegistry",
+    "Microsoft.ManagedIdentity",
+    "Microsoft.Compute",
+  ]
 
   features {}
 }
