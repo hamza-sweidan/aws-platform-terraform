@@ -1,0 +1,5 @@
+# Generated for you by bootstrap:
+#   terraform -chdir=../../bootstrap output -raw backend_config > backend.hcl
+# Then: terraform init -backend-config=backend.hcl
+bucket = "aws-platform-tfstate-111122223333-eu-central-1"
+region = "eu-central-1"

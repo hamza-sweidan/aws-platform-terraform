@@ -1,0 +1,12 @@
+# Pod Security Admission "restricted" is enforced: the API server rejects any
+# pod in this namespace that runs as root, escalates privileges, keeps Linux
+# capabilities or skips a seccomp profile.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: offline-demo
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

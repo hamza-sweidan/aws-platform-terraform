@@ -1,0 +1,33 @@
+# Enforced by the VPC CNI network policy agent (enableNetworkPolicy = true).
+#
+# Ingress: deny all, then allow HTTP only from pods in this namespace.
+# Egress: deliberately NOT restricted here. The demo proves the VPC itself
+# has no route to the internet, and a Kubernetes egress policy would hide
+# that by blocking the request first.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: offline-demo
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-http-from-namespace
+  namespace: offline-demo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080

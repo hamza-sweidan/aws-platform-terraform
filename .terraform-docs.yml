@@ -1,0 +1,36 @@
+# terraform-docs config. Regenerate every module README from the repo root:
+#   for d in bootstrap envs/dev modules/*; do terraform-docs -c .terraform-docs.yml "$d"; done
+#
+# Only the block between the BEGIN/END markers is generated. The hand-written
+# description and usage sections above it are preserved.
+formatter: markdown table
+version: ">= 0.24.0, < 1.0.0"
+
+# The description lives in the hand-written part of each README.
+sections:
+  hide:
+    - header
+
+output:
+  file: README.md
+  mode: inject
+  template: |-
+    <!-- BEGIN_TF_DOCS -->
+    {{ .Content }}
+    <!-- END_TF_DOCS -->
+
+sort:
+  enabled: true
+  by: required
+
+settings:
+  anchor: false
+  default: true
+  escape: true
+  hide-empty: true
+  indent: 2
+  lockfile: true
+  read-comments: true
+  required: true
+  sensitive: true
+  type: true

@@ -1,0 +1,120 @@
+name: terraform-ci
+
+# Static checks only. This workflow never receives AWS credentials and never
+# runs plan/apply: every step works offline against the code in the PR.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege for the GITHUB_TOKEN: read the repo, nothing else.
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the previous, now-stale run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: 1.16.3
+  TFLINT_VERSION: v0.64.0
+  CHECKOV_VERSION: 3.3.19
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  fmt:
+    name: terraform fmt
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Third-party actions are pinned to a full commit SHA (tag in the comment)
+      # so a moved or compromised tag can't change what runs in CI.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - run: terraform fmt -check -recursive -diff
+
+  discover:
+    name: find terraform directories
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      dirs: ${{ steps.find.outputs.dirs }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Every directory that contains .tf files is validated on its own, so new
+      # modules (and phase 2's azure/ tree) are picked up without editing CI.
+      - id: find
+        run: |
+          dirs=$(find . -name '*.tf' -not -path '*/.terraform/*' -printf '%h\n' \
+            | sed 's|^\./||' | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "dirs=${dirs}" >> "$GITHUB_OUTPUT"
+          echo "Terraform directories: ${dirs}"
+
+  validate:
+    name: terraform validate (${{ matrix.dir }})
+    needs: discover
+    if: needs.discover.outputs.dirs != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.discover.outputs.dirs) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      # -backend=false: skip the S3 backend entirely, so no credentials are needed.
+      # Root modules still honour their committed .terraform.lock.hcl.
+      - run: terraform init -backend=false
+      - run: terraform validate -no-color
+
+  tflint:
+    name: tflint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: terraform-linters/setup-tflint@1cf010d3c7aef302051ccdb68c14c5dc2efa34ef # v6.3.1
+        with:
+          tflint_version: ${{ env.TFLINT_VERSION }}
+          cache: true
+      - run: tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
+        env:
+          # Avoids GitHub API rate limits when downloading the AWS ruleset.
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact
+
+  checkov:
+    name: checkov
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install --disable-pip-version-check "checkov==${CHECKOV_VERSION}"
+      - run: checkov --config-file .checkov.yaml

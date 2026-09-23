@@ -1,0 +1,18 @@
+# Checkov config, used locally and in CI:  checkov --config-file .checkov.yaml
+#
+# Every accepted finding is suppressed inline, next to the resource, with a
+# written reason (#checkov:skip=ID:reason for Terraform, checkov.io/skipN
+# annotations for Kubernetes). Nothing is skipped globally here, so a new
+# resource can never inherit an exception it wasn't reviewed for.
+directory:
+  - .
+framework:
+  - terraform
+  - kubernetes
+  - github_actions
+  - secrets
+skip-path:
+  - \.terraform
+compact: true
+quiet: true
+download-external-modules: false

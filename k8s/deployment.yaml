@@ -1,0 +1,86 @@
+# nginx served from private ECR. ${DEMO_IMAGE} is replaced at deploy time with
+# the digest-pinned reference printed by scripts/mirror-image.sh:
+#
+#   DEMO_IMAGE=$(scripts/mirror-image.sh docker.io/nginxinc/nginx-unprivileged:1.30-alpine)
+#   export DEMO_IMAGE
+#   envsubst '$DEMO_IMAGE' < k8s/deployment.yaml | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: offline-demo
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: offline-demo
+  annotations:
+    checkov.io/skip1: CKV_K8S_43=The image is injected at deploy time as <ecr-repo>@sha256:<digest> from scripts/mirror-image.sh, so the running pod is digest-pinned
+    checkov.io/skip2: CKV_K8S_14=Same placeholder as CKV_K8S_43; the deployed reference is a digest, which is stronger than any tag
+    checkov.io/skip3: CKV_K8S_15=IfNotPresent is deliberate. A digest-pinned cached image can't be stale, and pods can still restart if the ECR endpoints are briefly unavailable
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+        app.kubernetes.io/part-of: offline-demo
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      # One replica per AZ when possible.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: web
+      containers:
+        - name: nginx
+          image: ${DEMO_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # nginx-unprivileged keeps its pid file and temp dirs in /tmp; the
+          # rest of the filesystem stays read-only.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
