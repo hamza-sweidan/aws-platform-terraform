@@ -1,0 +1,41 @@
+# --- Terraform --------------------------------------------------------------
+# Provider binaries and module cache, recreated by `terraform init`
+**/.terraform/*
+
+# State can contain secrets and resource IDs; it lives in S3, never in git
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+
+# Variable files hold account-specific values (IAM ARNs, emails).
+# Only the committed *.tfvars.example templates are tracked.
+*.tfvars
+*.tfvars.json
+
+# Partial backend config holds the account-specific state bucket name
+backend.hcl
+
+# Lock files are committed for root modules only (bootstrap, envs/*).
+# Reusable modules must not pin exact provider builds for their callers.
+modules/**/.terraform.lock.hcl
+
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# --- Kubernetes -------------------------------------------------------------
+kubeconfig
+*.kubeconfig
+
+# --- Editors / OS -----------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
