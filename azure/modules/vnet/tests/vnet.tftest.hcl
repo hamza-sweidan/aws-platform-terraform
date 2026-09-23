@@ -8,6 +8,7 @@ variables {
   resource_group_name = "rg-test"
   location            = "germanywestcentral"
   address_space       = ["10.10.0.0/22"]
+  tags                = { Project = "test", Owner = "me" }
 
   subnets = {
     shared = {
@@ -62,6 +63,16 @@ run "baseline_rules_on_every_subnet" {
   assert {
     condition     = alltrue([for s in azurerm_subnet.this : s.default_outbound_access_enabled == false])
     error_message = "Subnets must be private (no default outbound access)."
+  }
+
+  assert {
+    # The tag policy denies untagged resources, so a missing tags argument
+    # would fail the apply.
+    condition = (
+      azurerm_virtual_network.this.tags == tomap({ Project = "test", Owner = "me" }) &&
+      alltrue([for nsg in azurerm_network_security_group.this : nsg.tags == tomap({ Project = "test", Owner = "me" })])
+    )
+    error_message = "The VNet and every NSG must carry the caller's tags."
   }
 }
 
