@@ -22,3 +22,12 @@ plugin "aws" {
   version = "0.49.0"
   source  = "github.com/terraform-linters/tflint-ruleset-aws"
 }
+
+# Azure-specific rules for azure/: invalid locations, SKUs, name formats and
+# enum values the azurerm provider only rejects at apply time. Each ruleset
+# only inspects its own provider's resources, so both run on every directory.
+plugin "azurerm" {
+  enabled = true
+  version = "0.32.0"
+  source  = "github.com/terraform-linters/tflint-ruleset-azurerm"
+}

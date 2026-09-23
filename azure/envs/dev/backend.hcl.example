@@ -1,0 +1,5 @@
+# Generated for you by azure/bootstrap:
+#   terraform -chdir=../../bootstrap output -raw backend_config > backend.hcl
+# Then: terraform init -backend-config=backend.hcl
+storage_account_name = "sttfstate0123456789ab"
+container_name       = "tfstate"

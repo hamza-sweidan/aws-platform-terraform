@@ -1,7 +1,8 @@
 name: terraform-ci
 
-# Static checks only. This workflow never receives AWS credentials and never
-# runs plan/apply: every step works offline against the code in the PR.
+# Static checks only. This workflow never receives cloud credentials (AWS or
+# Azure) and never runs plan/apply: every step works offline against the
+# code in the PR.
 on:
   pull_request:
     branches: [main]
@@ -48,6 +49,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       dirs: ${{ steps.find.outputs.dirs }}
+      test_dirs: ${{ steps.find.outputs.test_dirs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -60,6 +62,13 @@ jobs:
             | sed 's|^\./||' | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "dirs=${dirs}" >> "$GITHUB_OUTPUT"
           echo "Terraform directories: ${dirs}"
+
+          # Modules with a tests/ directory of *.tftest.hcl files also get
+          # `terraform test`.
+          test_dirs=$(find . -path '*/tests/*.tftest.hcl' -not -path '*/.terraform/*' -printf '%h\n' \
+            | sed -e 's|/tests$||' -e 's|^\./||' | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "test_dirs=${test_dirs}" >> "$GITHUB_OUTPUT"
+          echo "Directories with tests: ${test_dirs}"
 
   validate:
     name: terraform validate (${{ matrix.dir }})
@@ -82,10 +91,37 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
-      # -backend=false: skip the S3 backend entirely, so no credentials are needed.
+      # -backend=false: skip the S3/azurerm backend entirely, so no credentials
+      # are needed.
       # Root modules still honour their committed .terraform.lock.hcl.
       - run: terraform init -backend=false
       - run: terraform validate -no-color
+
+  test:
+    name: terraform test (${{ matrix.dir }})
+    needs: discover
+    if: needs.discover.outputs.test_dirs != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.discover.outputs.test_dirs) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      # The tests use mock_provider, so they plan without credentials, and a
+      # test run never touches the configured backend.
+      - run: terraform init -backend=false
+      - run: terraform test -no-color
 
   tflint:
     name: tflint
@@ -101,7 +137,7 @@ jobs:
           cache: true
       - run: tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
         env:
-          # Avoids GitHub API rate limits when downloading the AWS ruleset.
+          # Avoids GitHub API rate limits when downloading the AWS and azurerm rulesets.
           GITHUB_TOKEN: ${{ github.token }}
       - run: tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact
 

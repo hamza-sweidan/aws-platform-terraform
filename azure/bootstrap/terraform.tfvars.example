@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+
+# az account show --query id -o tsv
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+owner = "your-github-handle"
+
+# Your public IPv4 (curl -s https://api.ipify.org). Plain IP, no /32.
+allowed_ip_ranges = ["203.0.113.10"]
+
+# location              = "germanywestcentral"
+# monthly_budget_amount = 20
+budget_alert_email = "you@example.com"

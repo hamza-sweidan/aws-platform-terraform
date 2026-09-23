@@ -1,5 +1,7 @@
 # terraform-docs config. Regenerate every module README from the repo root:
-#   for d in bootstrap envs/dev modules/*; do terraform-docs -c .terraform-docs.yml "$d"; done
+#   for d in bootstrap envs/dev modules/* azure/bootstrap azure/envs/dev azure/modules/*; do
+#     terraform-docs -c .terraform-docs.yml "$d"
+#   done
 #
 # Only the block between the BEGIN/END markers is generated. The hand-written
 # description and usage sections above it are preserved.
