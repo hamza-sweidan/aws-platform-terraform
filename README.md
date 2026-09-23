@@ -18,9 +18,15 @@ VPC endpoints. It's the air-gapped on-prem pattern, rebuilt on AWS.
 - **Access:** optional SSM bastion with no SSH, no public IP and no inbound
   rules. kubectl runs on your laptop through an SSM port-forward.
 - **State:** S3 backend with **native locking** (`use_lockfile`), no DynamoDB.
-- **Quality gates:** `fmt`, `validate`, `tflint` (AWS ruleset) and `checkov`
-  on every PR, with no cloud credentials in CI. Every accepted checkov finding
-  is justified inline.
+- **Quality gates:** `fmt`, `validate`, `tflint` (AWS and azurerm rulesets),
+  `checkov` and offline `terraform test` on every PR, with no cloud
+  credentials in CI. Every accepted checkov finding is justified inline.
+
+**Phase 2, [`azure/`](azure/README.md):** an Azure hub-and-spoke network under
+the same rules. A hub VNet and two spokes are peered (non-transitive, so the
+spokes are isolated). Every subnet has a default-deny NSG, and an Azure Policy
+**Deny** assignment enforces the required tags. State lives in Blob Storage
+with Entra ID-only access. It costs **$0.00/hour** while idle.
 
 ## Architecture
 
@@ -95,8 +101,10 @@ modules/
 envs/dev/            composes the modules; S3 backend with native locking; ECR mirror repos
 scripts/             mirror-image.sh: public image -> private ECR (crane or skopeo)
 k8s/                 sample workload that runs from the mirrored ECR digest
-docs/decisions/      ADRs
-docs/runbook.md      failure diagnosis
+azure/               phase 2: Azure hub-and-spoke (own bootstrap, modules, envs/dev)
+docs/decisions/      ADRs (0001-0004 AWS, 0005-0008 Azure)
+docs/runbook.md      failure diagnosis (AWS)
+docs/runbook-azure.md failure diagnosis (Azure)
 ```
 
 Each module README has a hand-written design section plus generated
@@ -248,8 +256,10 @@ runs on every pull request to `main`:
 1. `terraform fmt -check -recursive`
 2. `terraform validate` in every directory containing `.tf` files,
    discovered at runtime, with `init -backend=false`, so **no credentials**
-3. `tflint --recursive` with the pinned AWS ruleset
-4. `checkov` with the repo config
+3. `terraform test` in every module with a `tests/` directory (mocked
+   providers, so again no credentials)
+4. `tflint --recursive` with the pinned AWS and azurerm rulesets
+5. `checkov` with the repo config
 
 Actions are pinned to commit SHAs, and the workflow token is `contents: read`.
 
@@ -259,9 +269,15 @@ Actions are pinned to commit SHAs, and the workflow token is `contents: read`.
 - [0002: S3 native state locking](docs/decisions/0002-s3-native-state-locking.md)
 - [0003: Private-only API endpoint](docs/decisions/0003-private-only-api-endpoint.md)
 - [0004: SSM over SSH](docs/decisions/0004-ssm-over-ssh.md)
+- [0005: Azure hub-and-spoke with native VNet peering](docs/decisions/0005-hub-and-spoke-with-vnet-peering.md)
+- [0006: Default-deny NSG baseline and private subnets](docs/decisions/0006-default-deny-nsg-baseline.md)
+- [0007: Required tags with an Azure Policy Deny at resource-group scope](docs/decisions/0007-tag-policy-deny-at-resource-group-scope.md)
+- [0008: Azure state with Entra ID-only access](docs/decisions/0008-azure-state-entra-id-only.md)
 
-## Roadmap
+## Phase 2: Azure
 
-- **Phase 2**: `azure/`, an azurerm hub-and-spoke network (hub VNet, two
-  spokes, peering, NSGs, Azure Policy for required tags) with the same
-  quality gates and docs.
+[`azure/`](azure/README.md) is an azurerm hub-and-spoke network: a hub VNet,
+two spoke VNets peered to it, one default-deny NSG per subnet, and a custom
+Azure Policy that denies resources missing the required tags. It has its own
+bootstrap (Entra ID-only Blob Storage state), modules, environment, ADRs
+0005-0008 and [runbook](docs/runbook-azure.md).
