@@ -19,8 +19,8 @@ VPC endpoints. It's the air-gapped on-prem pattern, rebuilt on AWS.
   rules. kubectl runs on your laptop through an SSM port-forward.
 - **State:** S3 backend with **native locking** (`use_lockfile`), no DynamoDB.
 - **Quality gates:** `fmt`, `validate`, `tflint` (AWS and azurerm rulesets),
-  `checkov` and offline `terraform test` on every PR, with no cloud
-  credentials in CI. Every accepted checkov finding is justified inline.
+  `checkov`, `shellcheck` and offline `terraform test` on every PR, with no
+  cloud credentials in CI. Every accepted checkov finding is justified inline.
 
 **Phase 2, [`azure/`](azure/README.md):** an Azure hub-and-spoke network under
 the same rules. A hub VNet and two spokes are peered (non-transitive, so the
@@ -261,8 +261,41 @@ runs on every pull request to `main`:
    providers, so again no credentials)
 4. `tflint --recursive` with the pinned AWS and azurerm rulesets
 5. `checkov` with the repo config
+6. `shellcheck` on `scripts/*.sh`, pinned through PyPI
 
 Actions are pinned to commit SHAs, and the workflow token is `contents: read`.
+
+### Tests
+
+Every module and both environments have offline `terraform test` suites
+(`tests/*.tftest.hcl`). The provider is mocked, so they plan (or "apply"
+against the mock) with no credentials and create nothing. They pin the
+design claims this README makes, so a change that breaks one fails CI:
+
+| Suite | Checks |
+|---|---|
+| `modules/vpc` | Only the public route table has a route out; S3 gateway endpoint on the private table only and limited to `GetObject` on the ECR layer bucket; endpoints use private DNS in every private subnet and admit only 443 from the VPC CIDR; flow-log role confused-deputy condition; AZ validation and postcondition |
+| `modules/eks` | Private-only API endpoint; access entries only, no creator admin; secrets encrypted with the CMK; standard support only; IMDSv2 hop limit 1; encrypted gp3; no custom AMI or key pair; CNI on its IRSA role |
+| `modules/iam` | Node role gets exactly WorkerNode + ECR PullOnly; CNI role trusts only `kube-system/aws-node` tokens for STS; cluster KMS access scoped to one key; one access entry per admin |
+| `modules/bastion` | No public IP; IMDSv2; encrypted root volume; egress only 443 to the VPC; only the SSM core policy; Graviton types rejected |
+| `modules/kms` | Rotation; alias; CloudWatch Logs access only for the exact log group ARNs; reserved `aws/` alias rejected |
+| `envs/dev` | 5 core endpoints without the bastion, 8 with it; tunnel output only with the bastion; immutable, scanned ECR repos; AZ and admin validation |
+| `azure/*` | See the [Azure README](azure/README.md#tests) |
+
+```bash
+cd modules/vpc && terraform init -backend=false && terraform test
+```
+
+### Local checks (pre-commit)
+
+[`.pre-commit-config.yaml`](.pre-commit-config.yaml) runs the fast part of CI
+on every commit: `fmt`, `tflint`, terraform-docs regeneration, `shellcheck`
+and basic hygiene (line endings, merge markers, private keys). Hook repos are
+pinned to commit SHAs like the Actions.
+
+```bash
+pip install pre-commit && pre-commit install
+```
 
 ## Design decisions
 

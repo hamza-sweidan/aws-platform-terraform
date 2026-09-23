@@ -193,7 +193,7 @@ What the design leaves room for, and what it would cost if added:
 
 ## Tests
 
-The azure/ modules also have offline unit tests. Each `tests/*.tftest.hcl`
+The azure/ modules have offline unit tests, like the AWS ones. Each `tests/*.tftest.hcl`
 uses `mock_provider "azurerm"`, so `terraform test` plans with no credentials
 and no backend. CI runs them on every pull request.
 
