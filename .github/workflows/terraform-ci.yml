@@ -1,7 +1,8 @@
 name: terraform-ci
 
-# Static checks only. This workflow never receives AWS credentials and never
-# runs plan/apply: every step works offline against the code in the PR.
+# Static checks only. This workflow never receives cloud credentials (AWS or
+# Azure) and never runs plan/apply: every step works offline against the
+# code in the PR.
 on:
   pull_request:
     branches: [main]
@@ -82,7 +83,8 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
-      # -backend=false: skip the S3 backend entirely, so no credentials are needed.
+      # -backend=false: skip the S3/azurerm backend entirely, so no credentials
+      # are needed.
       # Root modules still honour their committed .terraform.lock.hcl.
       - run: terraform init -backend=false
       - run: terraform validate -no-color
@@ -101,7 +103,7 @@ jobs:
           cache: true
       - run: tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
         env:
-          # Avoids GitHub API rate limits when downloading the AWS ruleset.
+          # Avoids GitHub API rate limits when downloading the AWS and azurerm rulesets.
           GITHUB_TOKEN: ${{ github.token }}
       - run: tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact
 
