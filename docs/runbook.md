@@ -170,7 +170,7 @@ through GitHub OIDC ([ADR 0009](decisions/0009-pull-request-plans-with-oidc.md))
 
 | Error in the job log | Cause | Fix |
 |---|---|---|
-| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The token's subject doesn't match the trust policy: the workflow didn't run for a `pull_request` of this repository (a push, a manual run, a fork, or a renamed repository). | Check `github_repository` in `bootstrap/terraform.tfvars` and the trigger. The role trusts only `repo:<owner>/<repo>:pull_request`. |
+| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The token's subject doesn't match the trust policy: the workflow didn't run for a `pull_request` of this repository (a push, a manual run, a fork, or a renamed repository), or the repository IDs are wrong. | Check `github_repository` and `github_repository_ids` in `bootstrap/terraform.tfvars` against `gh api repos/OWNER/NAME/actions/oidc/customization/sub`, and the trigger. The role trusts only `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request`. |
 | `No OpenIDConnect provider found in your account` | `bootstrap` was applied without `github_repository`. | Set it and apply `bootstrap`. |
 | `Credentials could not be loaded` / `id-token` errors | The job lacks `permissions: id-token: write`. | Keep the job-level permissions block. |
 | `AccessDenied` on `s3:GetObject` for the state key | The `AWS_STATE_BUCKET` secret names a different bucket than the one the Deny statement exempts. | `terraform -chdir=bootstrap output -raw state_bucket_name` and update the secret. |

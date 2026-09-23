@@ -101,7 +101,7 @@ jobs:
       # The state account's firewall is default-Deny and runner IPs change
       # every job, so the job lets itself in and removes itself at the end.
       - name: Allow this runner through the state firewall
-        run: ../../scripts/azure-state-firewall.sh allow
+        run: ../../../scripts/azure-state-firewall.sh allow
       - name: terraform init
         run: |
           # Firewall changes take a little while to reach every storage front end.
@@ -115,7 +115,7 @@ jobs:
           done
           grep -A4 -E '^Error' init.log | head -20
           exit 1
-      - run: ../../scripts/ci-plan.sh "azure/envs/dev"
+      - run: ../../../scripts/ci-plan.sh "azure/envs/dev"
       - name: Remove this runner from the state firewall
         if: always()
-        run: ../../scripts/azure-state-firewall.sh revoke
+        run: ../../../scripts/azure-state-firewall.sh revoke

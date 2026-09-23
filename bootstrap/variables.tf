@@ -73,3 +73,17 @@ variable "github_repository" {
     error_message = "github_repository must look like owner/name."
   }
 }
+
+variable "github_repository_ids" {
+  description = "Immutable IDs of github_repository, which GitHub puts in the OIDC subject (repo:owner@ID/name@ID). Look them up with: gh api repos/OWNER/NAME --jq '{owner: .owner.id, repository: .id}'"
+  type = object({
+    owner      = number
+    repository = number
+  })
+  default = null
+
+  validation {
+    condition     = var.github_repository == null || var.github_repository_ids != null
+    error_message = "Set github_repository_ids together with github_repository; the role trust matches GitHub's immutable subject."
+  }
+}

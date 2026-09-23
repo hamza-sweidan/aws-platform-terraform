@@ -173,7 +173,7 @@ runner's IP through the state firewall, plans, and removes the IP again
 
 | Error in the job log | Cause | Fix |
 |---|---|---|
-| `AADSTS70021` / `AADSTS700213`: no matching federated identity record | The token's subject isn't `repo:<owner>/<repo>:pull_request`: wrong trigger, fork, or renamed repository. | Check `github_repository` in `azure/bootstrap/terraform.tfvars`, apply bootstrap. |
+| `AADSTS70021` / `AADSTS700213`: no matching federated identity record | The token's subject isn't `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request`: wrong trigger, fork, renamed repository, or wrong `github_repository_ids`. The error message shows the subject GitHub presented. | Compare it with `gh api repos/OWNER/NAME/actions/oidc/customization/sub`, fix `github_repository` / `github_repository_ids` in `azure/bootstrap/terraform.tfvars`, apply bootstrap. |
 | `AuthorizationFailed` on `storageAccounts/write` in the firewall step | The custom firewall role isn't assigned yet, or RBAC hasn't propagated (minutes after bootstrap). | Re-run the job; check `az role assignment list --assignee <client id> --all`. |
 | `RequestDisallowedByPolicy` in the firewall step, naming `deny-state-*` | The guardrail policy rejected the network-rule update. That only happens if the request would weaken the account, or if Azure evaluated the partial update on its own. | Run `scripts/azure-state-firewall.sh status`. If the account is healthy, set `state_guardrail_effect = "Audit"` in `azure/bootstrap` and apply. |
 | `terraform init` retries, then `AuthorizationFailure` (403) | The new firewall rule hadn't reached the storage front ends within ~2 minutes. | Re-run the job. |

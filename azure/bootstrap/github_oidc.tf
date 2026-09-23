@@ -9,6 +9,15 @@
 
 locals {
   github_oidc_enabled = var.github_repository != null
+
+  # GitHub's immutable subject: repo:OWNER@OWNER_ID/NAME@REPO_ID:pull_request.
+  # Names can be taken over after a rename or deletion; the IDs can't, so a
+  # new repository that reuses this name presents a different subject.
+  github_plan_subject = local.github_oidc_enabled ? format(
+    "repo:%s@%d/%s@%d:pull_request",
+    split("/", var.github_repository)[0], var.github_repository_ids.owner,
+    split("/", var.github_repository)[1], var.github_repository_ids.repository,
+  ) : null
 }
 
 resource "azurerm_user_assigned_identity" "github_plan" {
@@ -30,7 +39,7 @@ resource "azurerm_federated_identity_credential" "github_pull_request" {
   user_assigned_identity_id = azurerm_user_assigned_identity.github_plan[0].id
   issuer                    = "https://token.actions.githubusercontent.com"
   audience                  = ["api://AzureADTokenExchange"]
-  subject                   = "repo:${var.github_repository}:pull_request"
+  subject                   = local.github_plan_subject
 }
 
 # Plans refresh every resource in the environments, so the identity reads the
