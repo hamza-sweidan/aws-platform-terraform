@@ -25,6 +25,17 @@ run "definition_is_indexed_and_loops_over_the_tag_parameter" {
   }
 
   assert {
+    # Azure rejects current() in a `field` path; the lookup must be a value
+    # expression, guarded so resources without tags can't cause an error.
+    condition = (
+      jsondecode(azurerm_policy_definition.require_tags.policy_rule)["if"]["allOf"][0]["count"]["where"]["value"] ==
+      "[empty(if(empty(field('tags')), '', tryGet(field('tags'), current('tagName'))))]" &&
+      !can(jsondecode(azurerm_policy_definition.require_tags.policy_rule)["if"]["allOf"][0]["count"]["where"]["field"])
+    )
+    error_message = "The per-tag lookup must be a guarded value expression, never a field path built with current()."
+  }
+
+  assert {
     condition     = jsondecode(azurerm_policy_definition.require_tags.policy_rule)["if"]["allOf"][1]["not"]["allOf"][1]["field"] == "Microsoft.Network/networkInterfaces/privateEndpoint"
     error_message = "Only private endpoint NICs (created untagged by Azure) may be exempt."
   }

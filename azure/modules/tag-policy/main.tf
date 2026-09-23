@@ -44,6 +44,11 @@ resource "azurerm_policy_definition" "require_tags" {
   # "value count" loops over the tagNames parameter and counts the tags that
   # are missing or empty on the request. Any count above zero triggers the
   # effect, so one definition covers any number of required tags.
+  #
+  # Azure rejects current() inside a `field` path (UnsupportedPolicyRuleField),
+  # so the lookup is a value expression on field('tags'). A missing tag and ""
+  # both come out empty. The if() guard keeps tryGet away from resources with
+  # no tags at all: an evaluation error would count as a Deny.
   # The keys are quoted because checkov's HCL parser reads a bare `if` as a
   # keyword and would skip the whole file.
   policy_rule = jsonencode({
@@ -54,16 +59,8 @@ resource "azurerm_policy_definition" "require_tags" {
             value = "[parameters('tagNames')]"
             name  = "tagName"
             where = {
-              anyOf = [
-                {
-                  field  = "[concat('tags[', current('tagName'), ']')]"
-                  exists = "false"
-                },
-                {
-                  field  = "[concat('tags[', current('tagName'), ']')]"
-                  equals = ""
-                },
-              ]
+              value  = "[empty(if(empty(field('tags')), '', tryGet(field('tags'), current('tagName'))))]"
+              equals = true
             }
           }
           greater = 0
