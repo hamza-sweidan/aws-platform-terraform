@@ -74,6 +74,7 @@ azure/
     vnet-peering/     both hub<->spoke links, with address-space re-sync
     tag-policy/       required-tags policy definition + per-RG Deny assignments
   envs/dev/           hub + two spokes + peering + policy; traffic matrix
+scripts/azure-state-firewall.sh   allow your current IP through the state firewall
 docs/decisions/0005-0008   Azure ADRs
 docs/runbook-azure.md      Azure failure diagnosis
 ```
@@ -103,6 +104,13 @@ terraform init
 terraform plan -out=tfplan                        # 5 resources, 4 without a budget email
 terraform apply tfplan
 terraform output -raw backend_config > ../envs/dev/backend.hcl
+```
+
+On a different network later (office, travel), let your new IP through the
+state firewall before running Terraform:
+
+```bash
+scripts/azure-state-firewall.sh allow
 ```
 
 ## 2. Plan and apply the dev environment

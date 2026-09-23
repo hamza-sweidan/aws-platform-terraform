@@ -41,7 +41,7 @@ variable "owner" {
 }
 
 variable "allowed_ip_ranges" {
-  description = "Public IPv4 addresses or CIDRs allowed through the storage firewall (your laptop). Single IPs without a prefix; Azure rejects /31 and /32. Find yours with: curl -s https://api.ipify.org"
+  description = "Public IPv4 addresses or CIDRs allowed through the storage firewall when the account is created. Afterwards Terraform ignores the list; manage it with scripts/azure-state-firewall.sh. Single IPs without a prefix; Azure rejects /31 and /32. Find yours with: curl -s https://api.ipify.org"
   type        = list(string)
 
   validation {

@@ -100,6 +100,7 @@ modules/
   bastion/           optional SSM Session Manager host
 envs/dev/            composes the modules; S3 backend with native locking; ECR mirror repos
 scripts/             mirror-image.sh: public image -> private ECR (crane or skopeo)
+                     azure-state-firewall.sh: allow your current IP through the Azure state firewall
 k8s/                 sample workload that runs from the mirrored ECR digest
 azure/               phase 2: Azure hub-and-spoke (own bootstrap, modules, envs/dev)
 docs/decisions/      ADRs (0001-0004 AWS, 0005-0008 Azure)

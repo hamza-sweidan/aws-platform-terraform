@@ -68,8 +68,9 @@ resource "azurerm_storage_account" "state" {
   public_network_access = "Enabled"
   network_rules {
     default_action = "Deny"
-    ip_rules       = var.allowed_ip_ranges
-    bypass         = ["AzureServices"]
+    # Initial allowlist only; see ignore_changes below.
+    ip_rules = var.allowed_ip_ranges
+    bypass   = ["AzureServices"]
   }
 
   blob_properties {
@@ -94,9 +95,16 @@ resource "azurerm_storage_account" "state" {
 
   tags = local.tags
 
-  # Deleting the account orphans every resource its state tracks.
   lifecycle {
+    # Deleting the account orphans every resource its state tracks.
     prevent_destroy = true
+
+    # Default-Deny is enforced here, but *which* IPs are allowed is
+    # day-to-day state: the operator's IP changes between home and office.
+    # scripts/azure-state-firewall.sh manages the list, and Terraform leaves
+    # it alone instead of reverting it (and locking the operator out) on the
+    # next apply.
+    ignore_changes = [network_rules[0].ip_rules]
   }
 }
 

@@ -20,7 +20,7 @@ you which cause it is:
 | Error code | Cause | Fix |
 |---|---|---|
 | `AuthorizationPermissionMismatch` | Your identity has no data-plane role on the container yet. A new role assignment takes a few minutes to reach the storage data plane. | Wait 5-10 minutes after the bootstrap apply and retry. If it persists, check the assignment (below). |
-| `AuthorizationFailure` / *This request is not authorized to perform this operation* | Your public IP isn't in the storage firewall. It changes with ISP, VPN or network. | Update `allowed_ip_ranges` in `azure/bootstrap/terraform.tfvars` and apply bootstrap. |
+| `AuthorizationFailure` / *This request is not authorized to perform this operation* | Your public IP isn't in the storage firewall. It changes with ISP, VPN or network. | `scripts/azure-state-firewall.sh allow`, wait a minute, retry. Terraform ignores the allowlist after creation, so the next bootstrap apply won't undo it. |
 | `KeyBasedAuthenticationNotPermitted` | Something is trying to use the account key: `use_azuread_auth` missing from the backend, or `ARM_ACCESS_KEY` set in the shell. | Keep `use_azuread_auth = true` in `versions.tf`; `unset ARM_ACCESS_KEY ARM_SAS_TOKEN`. |
 
 **Diagnose.**
@@ -29,9 +29,8 @@ you which cause it is:
 # Can you list the container as yourself (Entra ID, no key)?
 az storage blob list --account-name "$SA" -c tfstate --auth-mode login -o table
 
-# Is your current IP the one in the firewall?
-curl -s https://api.ipify.org; echo
-az storage account show -n "$SA" -g "$RG_STATE" --query "networkRuleSet.{default:defaultAction, ips:ipRules[].ipAddressOrRange}"
+# Is your current IP in the firewall? (exit code 2 if not)
+scripts/azure-state-firewall.sh status
 
 # Do you hold the data-plane role on the container?
 az role assignment list --assignee "$ME" --all \

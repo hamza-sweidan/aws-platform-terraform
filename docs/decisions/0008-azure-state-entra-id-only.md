@@ -22,7 +22,11 @@ made them.
   the `tfstate` container only. Owner on the subscription is not enough, by
   design (see below).
 - **Network:** public endpoint with firewall default `Deny`, allowing only
-  `allowed_ip_ranges` (the operator's IP).
+  the operator's IPs. Terraform enforces the `Deny` and seeds the allowlist,
+  then ignores it (`ignore_changes`). `scripts/azure-state-firewall.sh` adds
+  the current IP when the operator moves between networks. Firewall changes go
+  through the ARM control plane, which the storage firewall doesn't gate, so
+  there's no lock-out.
 - **Recovery:** blob versioning plus 30-day soft delete for blobs and
   containers, GZRS replication, and `prevent_destroy` on the account and
   container.
@@ -51,7 +55,9 @@ data-plane role that shows up by name in the audit log.
 **Costs and limits**
 - A new role assignment takes a few minutes to reach the data plane. The first
   `terraform init` right after bootstrap can fail with 403 (runbook §1).
-- A changed home IP locks you out until `allowed_ip_ranges` is updated.
+- A new network needs `scripts/azure-state-firewall.sh allow` before the
+  first `terraform init` there. Old IPs stay allowed until revoked (`reset`
+  keeps only the current one).
 - Two tools need to know Shared Key is off: the provider (`storage_use_azuread
   = true`) and the backend (`use_azuread_auth = true`).
 - Cost: a few KB of GZRS storage plus a few thousand operations a month, well
