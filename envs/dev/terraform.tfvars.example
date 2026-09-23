@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+owner = "your-github-handle"
+
+# Your own IAM identity: `aws sts get-caller-identity --query Arn --output text`
+cluster_admin_principal_arns = ["arn:aws:iam::111122223333:user/your-user"]
+
+# region             = "eu-central-1"
+# availability_zones = ["eu-central-1a", "eu-central-1b"]
+# node_capacity_type = "SPOT"
+# node_instance_types = ["t3.medium", "t3a.medium"]
+
+# Needed to run kubectl against the private API (adds ~$0.08/h).
+enable_bastion = true
