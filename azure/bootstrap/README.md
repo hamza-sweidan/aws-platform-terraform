@@ -20,7 +20,7 @@ state, because it creates the backend everything else uses.
 | `prevent_destroy` on the account and container | `terraform destroy` fails instead of orphaning every environment's state. |
 | Consumption budget (optional) | Emails at 50/80/100% actual and 100% forecast spend. Budgets are free. |
 | Guardrail policies `deny-state-shared-key`, `deny-state-open-network` | Built-in Deny policies on this resource group: nobody (CI, the firewall script, the portal) can turn Shared Key back on or set the firewall to Allow. `state_guardrail_effect` switches them to Audit. |
-| Plan identity `id-hubspoke-github-plan` (optional, `github_repository`) | Managed identity with a federated credential for this repository's `pull_request` tokens. Reader on the subscription, Blob Data Reader on the container, and a custom role to edit this account's firewall for the length of a CI job. See [ADR 0009](../../docs/decisions/0009-pull-request-plans-with-oidc.md). |
+| Plan identity `id-hubspoke-github-plan` (optional, `github_repository`) | Managed identity with a federated credential for this repository's `pull_request` tokens, matched on GitHub's immutable subject (`github_repository_ids`). Reader on the subscription, Blob Data Reader on the container, and a custom role to edit this account's firewall for the length of a CI job. See [ADR 0009](../../docs/decisions/0009-pull-request-plans-with-oidc.md). |
 
 Locking uses **native blob leases**. `terraform plan` and `apply` take a lease
 on the state blob and release it at the end, so no second resource is needed.
@@ -109,6 +109,7 @@ account name from it (or from `STATE_ACCOUNT` / `STATE_RESOURCE_GROUP`).
 | subscription\_id | Azure subscription that holds the state account. Get it with: az account show --query id -o tsv | `string` | n/a | yes |
 | budget\_alert\_email | Email address for budget alerts. Leave null to skip creating the budget. | `string` | `null` | no |
 | github\_repository | GitHub repository (owner/name) whose pull\_request workflows may use the read-only plan identity. Leave null to create no identity. | `string` | `null` | no |
+| github\_repository\_ids | Immutable IDs of github\_repository, which GitHub puts in the OIDC subject (repo:owner@ID/name@ID). Look them up with: gh api repos/OWNER/NAME --jq '{owner: .owner.id, repository: .id}' | <pre>object({<br/>    owner      = number<br/>    repository = number<br/>  })</pre> | `null` | no |
 | location | Azure region for the state account. Use the same region as the environments. | `string` | `"germanywestcentral"` | no |
 | monthly\_budget\_amount | Monthly subscription budget, in the subscription's billing currency. Alerts fire at 50/80/100% actual and 100% forecast. | `number` | `20` | no |
 | project | Short project name. Used in the resource group name and the Project tag. | `string` | `"hubspoke"` | no |

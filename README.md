@@ -284,7 +284,8 @@ stored secret key ([ADR 0009](docs/decisions/0009-pull-request-plans-with-oidc.m
 
 - The identities are read-only: an IAM role in `bootstrap/` and a managed
   identity in `azure/bootstrap/`. Each trusts only this repository's
-  `pull_request` tokens.
+  `pull_request` tokens, matched on GitHub's immutable owner and repository
+  IDs, so a repository that later reuses the name can't use them.
 - Plans run with `-lock=false`. The job summary shows the `Plan:` line and
   each changed resource's address and action. The full plan, with account
   IDs and ARNs, never reaches this public repository's logs.

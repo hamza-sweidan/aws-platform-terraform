@@ -56,7 +56,8 @@ run "ci_role_trusts_only_this_repos_pull_requests" {
   command = apply
 
   variables {
-    github_repository = "hamza-sweidan/aws-platform-terraform"
+    github_repository     = "hamza-sweidan/aws-platform-terraform"
+    github_repository_ids = { owner = 210244091, repository = 1383148050 }
   }
 
   assert {
@@ -64,7 +65,7 @@ run "ci_role_trusts_only_this_repos_pull_requests" {
       for c in data.aws_iam_policy_document.github_plan_assume[0].statement[0].condition :
       c.variable == "token.actions.githubusercontent.com:sub" &&
       c.test == "StringEquals" &&
-      toset(c.values) == toset(["repo:hamza-sweidan/aws-platform-terraform:pull_request"])
+      toset(c.values) == toset(["repo:hamza-sweidan@210244091/aws-platform-terraform@1383148050:pull_request"])
     ])
     error_message = "The role must trust exactly this repository's pull_request tokens (StringEquals, no wildcards)."
   }
@@ -96,8 +97,21 @@ run "rejects_malformed_repository" {
   command = plan
 
   variables {
-    github_repository = "https://github.com/hamza-sweidan/aws-platform-terraform"
+    github_repository     = "https://github.com/hamza-sweidan/aws-platform-terraform"
+    github_repository_ids = { owner = 210244091, repository = 1383148050 }
   }
 
   expect_failures = [var.github_repository]
+}
+
+# A name-only subject would also match a repository that later reuses the name.
+run "ci_role_requires_immutable_ids" {
+  command = plan
+
+  variables {
+    github_repository     = "hamza-sweidan/aws-platform-terraform"
+    github_repository_ids = null
+  }
+
+  expect_failures = [var.github_repository_ids]
 }

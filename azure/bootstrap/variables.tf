@@ -102,6 +102,20 @@ variable "github_repository" {
   }
 }
 
+variable "github_repository_ids" {
+  description = "Immutable IDs of github_repository, which GitHub puts in the OIDC subject (repo:owner@ID/name@ID). Look them up with: gh api repos/OWNER/NAME --jq '{owner: .owner.id, repository: .id}'"
+  type = object({
+    owner      = number
+    repository = number
+  })
+  default = null
+
+  validation {
+    condition     = var.github_repository == null || var.github_repository_ids != null
+    error_message = "Set github_repository_ids together with github_repository; the federated credential matches GitHub's immutable subject."
+  }
+}
+
 variable "state_guardrail_effect" {
   description = "Effect of the built-in policies that keep the state account on Shared Key off and firewall default-Deny. Audit reports violations without blocking them."
   type        = string
