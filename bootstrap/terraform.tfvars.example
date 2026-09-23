@@ -3,3 +3,6 @@ owner              = "your-github-handle"
 region             = "eu-central-1"
 monthly_budget_usd = 120
 budget_alert_email = "you@example.com"
+
+# Read-only plan role for pull requests (.github/workflows/terraform-plan.yml)
+# github_repository = "your-github-handle/aws-platform-terraform"

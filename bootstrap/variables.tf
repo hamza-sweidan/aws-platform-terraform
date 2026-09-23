@@ -62,3 +62,14 @@ variable "budget_alert_email" {
     error_message = "budget_alert_email must be a valid email address or null."
   }
 }
+
+variable "github_repository" {
+  description = "GitHub repository (owner/name) whose pull_request workflows may assume the read-only plan role. Leave null to create no OIDC provider or role."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.github_repository == null || can(regex("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$", var.github_repository))
+    error_message = "github_repository must look like owner/name."
+  }
+}
