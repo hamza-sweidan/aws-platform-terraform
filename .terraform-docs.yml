@@ -6,6 +6,11 @@
 formatter: markdown table
 version: ">= 0.24.0, < 1.0.0"
 
+# The description lives in the hand-written part of each README.
+sections:
+  hide:
+    - header
+
 output:
   file: README.md
   mode: inject
