@@ -1,0 +1,51 @@
+# Local pre-commit hooks: the fast subset of CI, run on every `git commit`.
+#   pip install pre-commit && pre-commit install
+#   pre-commit run --all-files          # run everything once
+#
+# Hook repos are pinned to a commit SHA (tag in the comment), the same
+# supply-chain rule as the GitHub Actions in CI. Update with:
+#   pre-commit autoupdate --freeze
+# checkov and terraform test stay in CI only: they're slower, and CI is
+# where they're enforced.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: detect-private-key
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: 253d99053f80e4a368175e93b36edb662e7e5135 # frozen: v1.109.1
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_tflint
+        args:
+          - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
+
+  # terraform-docs runs as a local hook with the same loop as the header of
+  # .terraform-docs.yml. The upstream terraform_docs hook mangles an absolute
+  # --config path on Windows. A README that changes fails the commit, so stale
+  # docs can't be committed.
+  - repo: local
+    hooks:
+      - id: terraform-docs
+        name: terraform-docs (regenerate module READMEs)
+        entry: >-
+          bash -c 'for d in bootstrap envs/dev modules/* azure/bootstrap azure/envs/dev azure/modules/*;
+          do terraform-docs -c .terraform-docs.yml "$d" >/dev/null || exit 1; done'
+        language: system
+        files: \.tf$
+        pass_filenames: false
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: 745eface02aef23e168a8afb6b5737818efbea95 # frozen: v0.11.0.1
+    hooks:
+      - id: shellcheck
