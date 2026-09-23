@@ -1,0 +1,121 @@
+name: terraform-plan
+
+# Speculative plans on pull requests against the real AWS and Azure accounts,
+# with short-lived OIDC credentials. Nothing that can authenticate is stored
+# in GitHub:
+#
+#   secrets  account identifiers: role ARN, client/tenant/subscription IDs,
+#            state bucket/account names. They aren't credentials, but they're
+#            kept as secrets so they're masked in this public repo's logs.
+#   vars     AWS_PLAN_ENABLED / AZURE_PLAN_ENABLED = "true" turn a job on;
+#            OWNER is the Owner tag value.
+#
+# The identities are read-only (bootstrap/ and azure/bootstrap/ github_oidc.tf)
+# and trust only this repository's pull_request tokens. Plans run with
+# -lock=false, and only resource addresses and actions reach the job summary
+# (scripts/ci-plan.sh).
+on:
+  pull_request:
+    branches: [main]
+
+# Nothing at the top level; each job asks for exactly what it needs.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: 1.16.3
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  aws:
+    name: plan envs/dev (AWS)
+    if: vars.AWS_PLAN_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # request the job's OIDC token, nothing else
+    defaults:
+      run:
+        working-directory: envs/dev
+    env:
+      TF_VAR_owner: ${{ vars.OWNER }}
+      TF_VAR_cluster_admin_principal_arns: ${{ secrets.AWS_CLUSTER_ADMIN_ARNS }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+          role-session-name: gha-plan-${{ github.run_id }}
+          aws-region: eu-central-1
+          mask-aws-account-id: true
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - run: terraform init -no-color -backend-config="bucket=${{ secrets.AWS_STATE_BUCKET }}" -backend-config="region=eu-central-1"
+      - run: ../../scripts/ci-plan.sh "envs/dev (AWS)"
+
+  azure:
+    name: plan azure/envs/dev
+    if: vars.AZURE_PLAN_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # request the job's OIDC token, nothing else
+    defaults:
+      run:
+        working-directory: azure/envs/dev
+    env:
+      # Terraform (provider and azurerm backend) exchanges the GitHub token itself.
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_owner: ${{ vars.OWNER }}
+      # Read by scripts/azure-state-firewall.sh.
+      STATE_ACCOUNT: ${{ secrets.AZURE_STATE_ACCOUNT }}
+      STATE_RESOURCE_GROUP: rg-hubspoke-tfstate
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # az CLI session for the firewall script.
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      # The state account's firewall is default-Deny and runner IPs change
+      # every job, so the job lets itself in and removes itself at the end.
+      - name: Allow this runner through the state firewall
+        run: ../../scripts/azure-state-firewall.sh allow
+      - name: terraform init
+        run: |
+          # Firewall changes take a little while to reach every storage front end.
+          for attempt in 1 2 3 4 5 6; do
+            if terraform init -no-color -backend-config="storage_account_name=${STATE_ACCOUNT}" \
+              -backend-config="container_name=tfstate" >init.log 2>&1; then
+              exit 0
+            fi
+            echo "init attempt ${attempt} failed, retrying in 20s"
+            sleep 20
+          done
+          grep -A4 -E '^Error' init.log | head -20
+          exit 1
+      - run: ../../scripts/ci-plan.sh "azure/envs/dev"
+      - name: Remove this runner from the state firewall
+        if: always()
+        run: ../../scripts/azure-state-firewall.sh revoke
