@@ -93,6 +93,11 @@ The modules and the environment also have a `tests/` directory; see
 | Azure CLI | 2.x | `az login`; the account needs Owner (or Contributor + User Access Administrator) on the subscription for the role assignment and policy |
 | azurerm provider | 5.6.x | Pinned by the committed lock files |
 
+Commands in this README are bash (Git Bash on Windows). In **PowerShell**,
+quote any argument that contains a dot, e.g.
+`terraform init '-backend-config=backend.hcl'`. Unquoted, PowerShell splits
+it at the `.` and Terraform fails with *No positional arguments are expected*.
+
 ## 1. Bootstrap remote state (once per subscription)
 
 ```bash
