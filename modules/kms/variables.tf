@@ -3,8 +3,8 @@ variable "name" {
   type        = string
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9/_-]{1,200}$", var.name)) && !startswith(var.name, "aws")
-    error_message = "name may contain letters, digits, /, _ and -, and must not start with 'aws' (reserved for AWS managed keys)."
+    condition     = can(regex("^[a-zA-Z0-9/_-]{1,200}$", var.name)) && !startswith(var.name, "aws/")
+    error_message = "name may contain letters, digits, /, _ and -, and must not start with 'aws/' (alias/aws/* is reserved for AWS managed keys)."
   }
 }
 
