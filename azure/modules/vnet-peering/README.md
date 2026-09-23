@@ -61,7 +61,7 @@ module "peering" {
 
 | Name | Version |
 | ---- | ------- |
-| azurerm | 5.6.0 |
+| azurerm | >= 5.0, < 6.0 |
 
 ## Resources
 

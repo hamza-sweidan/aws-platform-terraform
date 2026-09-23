@@ -73,7 +73,7 @@ See the [Azure README](../../README.md) for verification and teardown.
 
 | Name | Version |
 | ---- | ------- |
-| azurerm | 5.6.0 |
+| azurerm | ~> 5.6 |
 
 ## Modules
 

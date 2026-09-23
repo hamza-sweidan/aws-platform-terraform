@@ -70,7 +70,7 @@ module "bastion" {
 
 | Name | Version |
 | ---- | ------- |
-| aws | 6.66.0 |
+| aws | >= 6.0, < 7.0 |
 
 ## Resources
 

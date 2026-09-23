@@ -31,7 +31,10 @@ settings:
   escape: true
   hide-empty: true
   indent: 2
-  lockfile: true
+  # false: the Providers table shows the version constraint, not the build in
+  # a local .terraform.lock.hcl. Module lock files are gitignored, so reading
+  # them made the README depend on whether `terraform init` had been run.
+  lockfile: false
   read-comments: true
   required: true
   sensitive: true
