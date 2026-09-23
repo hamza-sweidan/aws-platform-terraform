@@ -13,12 +13,15 @@ tfplan
 *.tfvars
 *.tfvars.json
 
-# Partial backend config holds the account-specific state bucket name
+# Partial backend config holds the account-specific state bucket or
+# storage account name
 backend.hcl
 
-# Lock files are committed for root modules only (bootstrap, envs/*).
-# Reusable modules must not pin exact provider builds for their callers.
+# Lock files are committed for root modules only (bootstrap, envs/*,
+# azure/bootstrap, azure/envs/*). Reusable modules must not pin exact
+# provider builds for their callers.
 modules/**/.terraform.lock.hcl
+azure/modules/**/.terraform.lock.hcl
 
 crash.log
 crash.*.log
