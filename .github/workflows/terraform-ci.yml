@@ -23,6 +23,7 @@ env:
   TF_VERSION: 1.16.3
   TFLINT_VERSION: v0.64.0
   CHECKOV_VERSION: 3.3.19
+  SHELLCHECK_VERSION: 0.11.0.1
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
 
@@ -154,3 +155,19 @@ jobs:
           python-version: "3.12"
       - run: pip install --disable-pip-version-check "checkov==${CHECKOV_VERSION}"
       - run: checkov --config-file .checkov.yaml
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      # Pinned through PyPI like checkov, instead of whatever shellcheck the
+      # runner image happens to ship.
+      - run: pip install --disable-pip-version-check "shellcheck-py==${SHELLCHECK_VERSION}"
+      - run: shellcheck --version && shellcheck scripts/*.sh
