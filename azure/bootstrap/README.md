@@ -78,7 +78,7 @@ account name from it (or from `STATE_ACCOUNT` / `STATE_RESOURCE_GROUP`).
 
 | Name | Version |
 | ---- | ------- |
-| azurerm | 5.6.0 |
+| azurerm | ~> 5.6 |
 
 ## Resources
 

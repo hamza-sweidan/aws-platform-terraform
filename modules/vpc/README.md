@@ -65,7 +65,7 @@ anything built on those subnets waits until the endpoints exist.
 
 | Name | Version |
 | ---- | ------- |
-| aws | 6.66.0 |
+| aws | >= 6.0, < 7.0 |
 
 ## Resources
 

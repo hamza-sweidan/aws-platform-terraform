@@ -49,7 +49,7 @@ and the same for the other resources.
 
 | Name | Version |
 | ---- | ------- |
-| aws | 6.66.0 |
+| aws | ~> 6.66 |
 
 ## Resources
 

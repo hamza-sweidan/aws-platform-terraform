@@ -49,7 +49,7 @@ teardown.
 
 | Name | Version |
 | ---- | ------- |
-| aws | 6.66.0 |
+| aws | ~> 6.66 |
 
 ## Modules
 
