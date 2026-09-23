@@ -18,6 +18,9 @@ repos:
       - id: mixed-line-ending
         args: [--fix=lf]
       - id: check-merge-conflict
+      # core.fileMode is false on Windows, so git never picks up chmod +x by
+      # itself; this checks the mode git records (git update-index --chmod=+x).
+      - id: check-shebang-scripts-are-executable
       - id: check-yaml
         args: [--allow-multiple-documents]
       - id: detect-private-key
