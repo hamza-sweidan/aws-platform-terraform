@@ -31,6 +31,12 @@ A *value count* loops over the `tagNames` parameter and counts the tags that
 are missing or empty in the request. If the count is above zero, the effect
 applies. One definition therefore handles any number of tags.
 
+One narrow exemption: **network interfaces that belong to a private
+endpoint** (`Microsoft.Network/networkInterfaces/privateEndpoint` exists).
+Azure creates that NIC itself, untagged, and there's no way to pass it tags,
+so without the exemption the Deny would block every private endpoint. All
+other NICs still need the tags.
+
 ## Design choices
 
 | Choice | Why |
