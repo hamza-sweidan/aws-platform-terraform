@@ -13,23 +13,30 @@ policy the apply fails instead, and a portal click-op gets the same treatment.
 ## How the rule works
 
 ```json
-"if": {
-  "count": {
-    "value": "[parameters('tagNames')]",
-    "name": "tagName",
-    "where": { "anyOf": [
-      { "field": "[concat('tags[', current('tagName'), ']')]", "exists": "false" },
-      { "field": "[concat('tags[', current('tagName'), ']')]", "equals": "" }
-    ]}
-  },
-  "greater": 0
+"count": {
+  "value": "[parameters('tagNames')]",
+  "name": "tagName",
+  "where": {
+    "value": "[empty(if(empty(field('tags')), '', tryGet(field('tags'), current('tagName'))))]",
+    "equals": true
+  }
 },
-"then": { "effect": "[parameters('effect')]" }
+"greater": 0
 ```
 
 A *value count* loops over the `tagNames` parameter and counts the tags that
 are missing or empty in the request. If the count is above zero, the effect
 applies. One definition therefore handles any number of tags.
+
+Two details learned from the first real apply:
+
+- **`current()` can't go in a `field` path.** The obvious
+  `"field": "[concat('tags[', current('tagName'), ']')]"` passes every
+  offline check, but Azure rejects it with `UnsupportedPolicyRuleField`. The
+  lookup is a `value` expression on `field('tags')` instead.
+- **An evaluation error is a Deny.** `tryGet` on a resource with no tags at
+  all could fail, so `if(empty(field('tags')), '', ...)` guards it. `if()`
+  only evaluates the branch it takes.
 
 One narrow exemption: **network interfaces that belong to a private
 endpoint** (`Microsoft.Network/networkInterfaces/privateEndpoint` exists).
