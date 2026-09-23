@@ -180,12 +180,12 @@ resource "aws_launch_template" "node" {
 
   tag_specifications {
     resource_type = "instance"
-    tags          = merge(var.tags, { Name = "${var.cluster_name}-node" })
+    tags          = merge(var.tags, var.node_tags, { Name = "${var.cluster_name}-node" })
   }
 
   tag_specifications {
     resource_type = "volume"
-    tags          = merge(var.tags, { Name = "${var.cluster_name}-node" })
+    tags          = merge(var.tags, var.node_tags, { Name = "${var.cluster_name}-node" })
   }
 
   tags = var.tags

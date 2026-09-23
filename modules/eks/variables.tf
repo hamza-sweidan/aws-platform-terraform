@@ -212,3 +212,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "node_tags" {
+  description = "Tags for node EC2 instances and volumes. Provider default_tags don't reach launch template tag_specifications, so pass them here for cost allocation."
+  type        = map(string)
+  default     = {}
+}

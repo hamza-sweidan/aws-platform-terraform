@@ -110,6 +110,7 @@ module "eks" {
 | node\_instance\_types | Instance types for the node group. With SPOT, list several of the same size to improve capacity. | `list(string)` | <pre>[<br/>  "t3.medium"<br/>]</pre> | no |
 | node\_max\_size | Maximum number of nodes. | `number` | `3` | no |
 | node\_min\_size | Minimum number of nodes. | `number` | `1` | no |
+| node\_tags | Tags for node EC2 instances and volumes. Provider default\_tags don't reach launch template tag\_specifications, so pass them here for cost allocation. | `map(string)` | `{}` | no |
 | service\_ipv4\_cidr | CIDR for Kubernetes Service ClusterIPs. Must not overlap the VPC or anything it's peered with. | `string` | `"172.20.0.0/16"` | no |
 | tags | Extra tags for EKS resources. | `map(string)` | `{}` | no |
 
