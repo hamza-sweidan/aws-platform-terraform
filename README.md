@@ -296,7 +296,7 @@ stored secret key ([ADR 0009](docs/decisions/0009-pull-request-plans-with-oidc.m
 Each job stays off until its identity exists and its `*_PLAN_ENABLED`
 variable is `true`. The Azure job is on; the AWS job waits for `bootstrap/`
 to be applied. One-time setup, after applying a bootstrap with
-`github_repository` set:
+`github_repository` and `github_repository_ids` set:
 
 ```bash
 gh variable set OWNER --body "<your-github-handle>"
