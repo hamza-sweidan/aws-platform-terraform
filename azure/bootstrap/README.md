@@ -13,7 +13,7 @@ state, because it creates the backend everything else uses.
 | Storage account `sttfstate<hash>` | Remote state. Names are global and can't contain hyphens; a hash of the subscription ID keeps the name unique and repeatable with no random suffix. |
 | GZRS replication | Zone-redundant in Germany West Central, with an async copy to Germany North. Survives a zone or regional outage and stays in Germany. |
 | `shared_access_key_enabled = false` | No account keys and no account SAS. Every request is authorised with Entra ID and shows up with the caller's identity. |
-| Storage firewall, default `Deny` | Only `allowed_ip_ranges` (your laptop) can reach the blob endpoint. |
+| Storage firewall, default `Deny` | Only allowlisted IPs can reach the blob endpoint. Terraform enforces the `Deny` and seeds the list from `allowed_ip_ranges`, then ignores the list: [`scripts/azure-state-firewall.sh`](../../scripts/azure-state-firewall.sh) manages it as your IP changes. |
 | Blob versioning + 30-day soft delete | Every state write is a new version. A bad apply can be rolled back, and a deleted blob or container can be restored. |
 | Infrastructure encryption | A second AES-256 layer at rest. Free, but it can only be set at creation. |
 | Role assignment: Storage Blob Data Contributor | Owner is a control-plane role and can't read blobs through Entra ID. This data-plane role is scoped to the one container. |
@@ -45,8 +45,26 @@ The role assignment can take a few minutes to reach the storage data plane.
 If the first `terraform init` in `azure/envs/dev` fails with a 403, see the
 [Azure runbook](../../docs/runbook-azure.md#1-terraform-init-fails-with-403-on-the-state-account).
 
+## Working from a new network
+
+Your public IP changes between home, office and mobile. The storage firewall
+only guards the blob **data plane**. Changing the firewall is a **control
+plane** (ARM) call, which works from anywhere for an Owner or Contributor. So
+from a new network:
+
+```bash
+scripts/azure-state-firewall.sh status    # allowed IPs, and whether yours is one
+scripts/azure-state-firewall.sh allow     # add your current IP
+scripts/azure-state-firewall.sh reset     # or: allow only your current IP, drop the rest
+```
+
+Terraform keeps `default_action = "Deny"` and would revert anyone opening the
+firewall, but `ignore_changes` on `ip_rules` stops it removing the IPs the
+script added. The posture lives in code, and the allowlist is day-to-day state.
+
 Keep `azure/bootstrap/terraform.tfstate` safe; it's gitignored. If it's lost,
-re-adopt the resources with `terraform import`.
+re-adopt the resources with `terraform import`. The script also reads the
+account name from it (or from `STATE_ACCOUNT` / `STATE_RESOURCE_GROUP`).
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -77,7 +95,7 @@ re-adopt the resources with `terraform import`.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| allowed\_ip\_ranges | Public IPv4 addresses or CIDRs allowed through the storage firewall (your laptop). Single IPs without a prefix; Azure rejects /31 and /32. Find yours with: curl -s https://api.ipify.org | `list(string)` | n/a | yes |
+| allowed\_ip\_ranges | Public IPv4 addresses or CIDRs allowed through the storage firewall when the account is created. Afterwards Terraform ignores the list; manage it with scripts/azure-state-firewall.sh. Single IPs without a prefix; Azure rejects /31 and /32. Find yours with: curl -s https://api.ipify.org | `list(string)` | n/a | yes |
 | owner | Value for the Owner tag, e.g. your GitHub handle. | `string` | n/a | yes |
 | subscription\_id | Azure subscription that holds the state account. Get it with: az account show --query id -o tsv | `string` | n/a | yes |
 | budget\_alert\_email | Email address for budget alerts. Leave null to skip creating the budget. | `string` | `null` | no |
