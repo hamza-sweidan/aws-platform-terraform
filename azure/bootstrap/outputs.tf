@@ -30,3 +30,13 @@ output "budget_name" {
   description = "Name of the monthly budget, or null if no alert email was given."
   value       = one(azurerm_consumption_budget_subscription.monthly[*].name)
 }
+
+output "github_plan_client_id" {
+  description = "Client ID of the plan identity (AZURE_CLIENT_ID secret), or null when github_repository isn't set."
+  value       = one(azurerm_user_assigned_identity.github_plan[*].client_id)
+}
+
+output "tenant_id" {
+  description = "Entra tenant ID (AZURE_TENANT_ID secret)."
+  value       = data.azurerm_client_config.current.tenant_id
+}

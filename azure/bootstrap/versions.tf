@@ -20,7 +20,7 @@ provider "azurerm" {
 
   # azurerm 5.0 stopped registering ~60 Resource Providers on startup. Register
   # only the ones this configuration creates resources in.
-  resource_providers_to_register = ["Microsoft.Storage", "Microsoft.Consumption"]
+  resource_providers_to_register = ["Microsoft.Storage", "Microsoft.Consumption", "Microsoft.ManagedIdentity"]
 
   # Shared Key is disabled on the state account, so any data-plane call the
   # provider makes has to authenticate with Entra ID instead.

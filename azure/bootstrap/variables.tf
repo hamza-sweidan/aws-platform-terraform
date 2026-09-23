@@ -90,3 +90,25 @@ variable "budget_alert_email" {
     error_message = "budget_alert_email must be a valid email address or null."
   }
 }
+
+variable "github_repository" {
+  description = "GitHub repository (owner/name) whose pull_request workflows may use the read-only plan identity. Leave null to create no identity."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.github_repository == null || can(regex("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$", var.github_repository))
+    error_message = "github_repository must look like owner/name."
+  }
+}
+
+variable "state_guardrail_effect" {
+  description = "Effect of the built-in policies that keep the state account on Shared Key off and firewall default-Deny. Audit reports violations without blocking them."
+  type        = string
+  default     = "Deny"
+
+  validation {
+    condition     = contains(["Deny", "Audit", "Disabled"], var.state_guardrail_effect)
+    error_message = "state_guardrail_effect must be Deny, Audit or Disabled."
+  }
+}
