@@ -118,3 +118,58 @@ variable "tag_policy_effect" {
     error_message = "tag_policy_effect must be Deny, Audit or Disabled."
   }
 }
+
+variable "enable_aks" {
+  description = "Create the Phase 3 private AKS spoke: network-isolated cluster, private ACR, peering (~$0.18/h with 2 nodes while it exists)."
+  type        = bool
+  default     = false
+}
+
+variable "aks_address_space" {
+  description = "AKS spoke VNet CIDR. The first /24 holds the nodes and the private endpoints (pods use the overlay CIDR, not the VNet)."
+  type        = string
+  default     = "10.13.0.0/22"
+
+  validation {
+    condition     = can(cidrhost(var.aks_address_space, 0)) && tonumber(split("/", var.aks_address_space)[1]) <= 24
+    error_message = "aks_address_space must be a valid IPv4 CIDR of /24 or larger."
+  }
+
+  validation {
+    # Same integer-range check as var.spokes: peered VNets must not overlap.
+    condition = alltrue([
+      for c in concat([var.hub_address_space], [for s in values(var.spokes) : s.address_space]) :
+      (
+        sum([for n, octet in split(".", cidrhost(var.aks_address_space, 0)) : tonumber(octet) * pow(256, 3 - n)]) + pow(2, 32 - tonumber(split("/", var.aks_address_space)[1]))
+        <= sum([for n, octet in split(".", cidrhost(c, 0)) : tonumber(octet) * pow(256, 3 - n)])
+        ) || (
+        sum([for n, octet in split(".", cidrhost(c, 0)) : tonumber(octet) * pow(256, 3 - n)]) + pow(2, 32 - tonumber(split("/", c)[1]))
+        <= sum([for n, octet in split(".", cidrhost(var.aks_address_space, 0)) : tonumber(octet) * pow(256, 3 - n)])
+      )
+    ])
+    error_message = "aks_address_space must not overlap the hub or any spoke."
+  }
+}
+
+variable "aks_node_count" {
+  description = "AKS nodes (Standard_B2als_v2, 2 vCPU each). Two use a Free Trial's whole 4-vCPU regional quota."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.aks_node_count >= 1 && var.aks_node_count <= 2
+    error_message = "aks_node_count must be 1 or 2 (a Free Trial allows 4 vCPUs per region)."
+  }
+}
+
+variable "aks_kubernetes_version" {
+  description = "AKS Kubernetes minor version (the region's default when pinned)."
+  type        = string
+  default     = "1.35"
+}
+
+variable "aks_admin_object_ids" {
+  description = "Entra object IDs given AKS RBAC Cluster Admin. Empty means the identity running Terraform."
+  type        = list(string)
+  default     = []
+}

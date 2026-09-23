@@ -73,6 +73,8 @@ azure/
     vnet/             VNet, private subnets, one default-deny NSG per subnet
     vnet-peering/     both hub<->spoke links, with address-space re-sync
     tag-policy/       required-tags policy definition + per-RG Deny assignments
+    acr-private/      Premium ACR, private endpoint + DNS, AKS bootstrap cache rule
+    aks/              network-isolated private AKS (Phase 3)
   envs/dev/           hub + two spokes + peering + policy; traffic matrix
 scripts/azure-state-firewall.sh   allow your current IP through the state firewall
 docs/decisions/0005-0008   Azure ADRs
@@ -169,6 +171,41 @@ per month, so leave it for the next session. To remove it completely, delete
 in `azure/bootstrap`. Destroy the environments first, since their state lives
 there.
 
+## Phase 3: private AKS (optional)
+
+`enable_aks = true` in `azure/envs/dev/terraform.tfvars` adds a
+**network-isolated private AKS cluster** in its own spoke: the Azure
+counterpart of the zero-egress EKS cluster
+([ADR 0010](../docs/decisions/0010-network-isolated-private-aks.md)).
+
+- `outbound_type = "none"`: no egress path at all. Nodes pull AKS's system
+  images through a private ACR's cache rule (`bootstrap_profile = Cache`).
+- Private API server; kubectl runs *inside* the cluster through
+  `az aks command invoke`, so there's no jump host.
+- Entra ID only (local accounts off, Azure RBAC for Kubernetes). The kubelet
+  identity holds nothing but AcrPull on the one registry.
+- 2 × Standard_B2als_v2, which uses a Free Trial's whole 4-vCPU quota. That's
+  why automatic upgrades (which add a surge node) are off.
+
+Before the first apply, check the quota (Compute must be registered; the
+first `enable_aks` apply registers it):
+
+```bash
+az vm list-usage -l germanywestcentral --query "[?contains(name.value, 'BASv2') || name.value=='cores'].{name:name.localizedValue, used:currentValue, limit:limit}" -o table
+```
+
+Then:
+
+```bash
+cd azure/envs/dev
+terraform plan -out=tfplan -var enable_aks=true   # 20 more resources
+terraform apply tfplan                            # ~10 min, mostly the cluster
+terraform output -raw aks_verify_commands         # checks + the offline demo
+```
+
+Turn it off again with `terraform apply -var enable_aks=false` (or set it in
+tfvars). The hub, spokes and policy stay.
+
 ## Estimated cost
 
 List prices from the Azure Retail Prices API, Germany West Central, USD
@@ -182,6 +219,18 @@ List prices from the Azure Retail Prices API, Germany West Central, USD
 | State storage, Hot GZRS | $0.046/GB-month + $0.1175 per 10K writes | < $0.10/month |
 | Consumption budget | free | $0.00 |
 | **Total while idle** | | **$0.00/h** |
+
+With `enable_aks = true`:
+
+| Component | Price | USD / hour |
+|---|---|---:|
+| AKS control plane, Free tier | $0 | 0.000 |
+| 2 × Standard_B2als_v2 nodes | $0.0432/h each | 0.086 |
+| 2 × 32 GB Standard SSD OS disks (E4) | $2.40/month each | 0.007 |
+| ACR Premium | $1.6666/day | 0.069 |
+| 2 private endpoints (ACR, API server) | $0.01/h each | 0.020 |
+| 2 private DNS zones | $0.50/month each | 0.001 |
+| **Total** | | **~0.18 (~$4.40/day)** |
 
 What the design leaves room for, and what it would cost if added:
 
@@ -202,7 +251,9 @@ and no backend. CI runs them on every pull request.
 | `modules/vnet` | Baseline rules on every NSG, inbound/outbound field mapping, private subnets, tags, rejection of reserved/duplicate priorities and mixed service-tag lists |
 | `modules/vnet-peering` | Both links, safe defaults, gateway transit on both sides, re-sync triggers |
 | `modules/tag-policy` | `Indexed` mode, rule loops over the parameter, one assignment per RG, bad effects rejected |
-| `envs/dev` | Full plan: 2 spokes + 2 peerings, address plan, tags on every RG, policy tags == Terraform tags, overlap validation |
+| `modules/acr-private` | Registry lockdown (Premium, no public access, no admin, no anonymous pull), the exact `aks-managed-mcr` cache rule, private endpoint and DNS |
+| `modules/aks` | `outbound_type = none` + bootstrap Cache, private API, Entra-only access, least-privilege role scopes, node sizing |
+| `envs/dev` | Full plan: 2 spokes + 2 peerings, address plan, tags on every RG, policy tags == Terraform tags, overlap validation; AKS off by default, on adds spoke + registry + cluster |
 
 ```bash
 cd azure/modules/vnet && terraform init -backend=false && terraform test
@@ -229,3 +280,4 @@ Fixed rather than skipped: CKV_AZURE_206 (replication raised from ZRS to GZRS).
 - [0007: Required tags with an Azure Policy Deny at resource-group scope](../docs/decisions/0007-tag-policy-deny-at-resource-group-scope.md)
 - [0008: Azure state with Entra ID-only access](../docs/decisions/0008-azure-state-entra-id-only.md)
 - [0009: Pull request plans with OIDC and read-only identities](../docs/decisions/0009-pull-request-plans-with-oidc.md)
+- [0010: Network-isolated private AKS](../docs/decisions/0010-network-isolated-private-aks.md)

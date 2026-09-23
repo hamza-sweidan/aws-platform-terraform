@@ -28,6 +28,11 @@ spokes are isolated). Every subnet has a default-deny NSG, and an Azure Policy
 **Deny** assignment enforces the required tags. State lives in Blob Storage
 with Entra ID-only access. It costs **$0.00/hour** while idle.
 
+**Phase 3 (optional, `enable_aks`):** a **network-isolated private AKS**
+cluster in its own spoke, the Azure twin of the EKS design. It has no egress
+path, bootstraps from a private ACR cache, is Entra ID only, and kubectl
+reaches it through `az aks command invoke`. About $0.18/h while it exists.
+
 ## Architecture
 
 ```mermaid
@@ -343,6 +348,7 @@ pip install pre-commit && pre-commit install
 - [0007: Required tags with an Azure Policy Deny at resource-group scope](docs/decisions/0007-tag-policy-deny-at-resource-group-scope.md)
 - [0008: Azure state with Entra ID-only access](docs/decisions/0008-azure-state-entra-id-only.md)
 - [0009: Pull request plans with OIDC and read-only identities](docs/decisions/0009-pull-request-plans-with-oidc.md)
+- [0010: Network-isolated private AKS](docs/decisions/0010-network-isolated-private-aks.md)
 
 ## Phase 2: Azure
 

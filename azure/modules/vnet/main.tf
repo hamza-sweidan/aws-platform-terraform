@@ -22,8 +22,8 @@ locals {
           access      = r.access
           protocol    = r.protocol
           ports       = r.destination_port_ranges
-          source      = r.direction == "Inbound" ? r.remote_address_prefixes : [subnet.address_prefix]
-          destination = r.direction == "Inbound" ? [subnet.address_prefix] : r.remote_address_prefixes
+          source      = r.direction == "Inbound" ? r.remote_address_prefixes : coalesce(r.local_address_prefixes, [subnet.address_prefix])
+          destination = r.direction == "Inbound" ? coalesce(r.local_address_prefixes, [subnet.address_prefix]) : r.remote_address_prefixes
           description = r.description
         }
       },

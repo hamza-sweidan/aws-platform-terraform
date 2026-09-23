@@ -20,8 +20,13 @@ run "definition_is_indexed_and_loops_over_the_tag_parameter" {
   }
 
   assert {
-    condition     = jsondecode(azurerm_policy_definition.require_tags.policy_rule)["if"]["count"]["value"] == "[parameters('tagNames')]"
+    condition     = jsondecode(azurerm_policy_definition.require_tags.policy_rule)["if"]["allOf"][0]["count"]["value"] == "[parameters('tagNames')]"
     error_message = "The rule must count over the tagNames parameter, not a hard-coded list."
+  }
+
+  assert {
+    condition     = jsondecode(azurerm_policy_definition.require_tags.policy_rule)["if"]["allOf"][1]["not"]["allOf"][1]["field"] == "Microsoft.Network/networkInterfaces/privateEndpoint"
+    error_message = "Only private endpoint NICs (created untagged by Azure) may be exempt."
   }
 
   assert {

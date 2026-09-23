@@ -42,6 +42,11 @@ A custom Azure Policy definition (`azure/modules/tag-policy`):
   Resources created in the same apply may not be evaluated yet.
 - Deny only acts on creates and updates. Existing untagged resources are
   reported as non-compliant, not blocked or fixed.
+- *Added with Phase 3:* network interfaces that belong to a private endpoint
+  are exempt. Azure creates them untagged and callers can't tag them, so a
+  Deny would block every private endpoint (the ACR endpoint AKS depends on).
+  The exemption checks `networkInterfaces/privateEndpoint`, so other NICs are
+  still covered.
 
 ## Why resource-group scope
 

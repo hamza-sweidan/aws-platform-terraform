@@ -69,7 +69,7 @@ module "hub" {
           priority                = 100
           direction               = "Inbound"
           protocol                = "*" # DNS uses UDP and falls back to TCP
-          remote_address_prefixes = [for s in values(var.spokes) : s.address_space]
+          remote_address_prefixes = concat([for s in values(var.spokes) : s.address_space], var.enable_aks ? [var.aks_address_space] : [])
           destination_port_ranges = ["53"]
           description             = "Spokes resolve names through shared DNS in the hub."
         }
@@ -150,5 +150,6 @@ module "tag_policy" {
   resource_group_ids = merge(
     { hub = azurerm_resource_group.hub.id },
     { for k, rg in azurerm_resource_group.spoke : k => rg.id },
+    { for rg in azurerm_resource_group.aks : "aks" => rg.id },
   )
 }

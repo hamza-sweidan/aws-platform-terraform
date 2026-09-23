@@ -34,8 +34,11 @@ Two more subnet settings back this up:
 - **One NSG per subnet**, not one per VNet. Each subnet's rule set can be
   read on its own, and a change to one tier can't open another.
 - **`remote_address_prefixes`** is the other side of a rule: the source of an
-  inbound rule, the destination of an outbound one. This subnet is always the
-  other end, so a rule can't accidentally apply to a wider range.
+  inbound rule, the destination of an outbound one. This subnet is the local
+  end by default, so a rule can't accidentally apply to a wider range.
+  `local_address_prefixes` overrides the local end when addresses that live
+  outside the subnet belong to it, such as an AKS Azure CNI Overlay pod CIDR.
+  Overlay pod-to-pod traffic keeps pod IPs, so the NSG sees them.
 - **`subnet_ids` waits for the NSG associations** (`depends_on` on the
   output), so nothing a caller builds in a subnet can land before its NSG.
 - **Platform subnets aren't created here.** `GatewaySubnet`,
@@ -115,7 +118,7 @@ module "hub" {
 | location | Azure region. | `string` | n/a | yes |
 | name | Base name, e.g. hubspoke-hub-dev. Resources become vnet-<name>, snet-<subnet> and nsg-<name>-<subnet>. | `string` | n/a | yes |
 | resource\_group\_name | Resource group for the VNet and its NSGs. | `string` | n/a | yes |
-| subnets | Subnets keyed by short name (snet-<key>). Every subnet gets its own NSG with<br/>the module's baseline rules (see README) plus the rules given here. For each<br/>rule, remote\_address\_prefixes is the source of an Inbound rule and the<br/>destination of an Outbound rule; the other side is always this subnet. | <pre>map(object({<br/>    address_prefix = string<br/>    nsg_rules = optional(map(object({<br/>      priority                = number<br/>      direction               = string<br/>      access                  = optional(string, "Allow")<br/>      protocol                = string<br/>      remote_address_prefixes = list(string)<br/>      destination_port_ranges = list(string)<br/>      description             = optional(string, "")<br/>    })), {})<br/>  }))</pre> | n/a | yes |
+| subnets | Subnets keyed by short name (snet-<key>). Every subnet gets its own NSG with<br/>the module's baseline rules (see README) plus the rules given here. For each<br/>rule, remote\_address\_prefixes is the source of an Inbound rule and the<br/>destination of an Outbound rule. The other side is this subnet, unless<br/>local\_address\_prefixes overrides it (e.g. to include an AKS overlay pod<br/>CIDR, whose addresses live outside the subnet). | <pre>map(object({<br/>    address_prefix = string<br/>    nsg_rules = optional(map(object({<br/>      priority                = number<br/>      direction               = string<br/>      access                  = optional(string, "Allow")<br/>      protocol                = string<br/>      remote_address_prefixes = list(string)<br/>      local_address_prefixes  = optional(list(string))<br/>      destination_port_ranges = list(string)<br/>      description             = optional(string, "")<br/>    })), {})<br/>  }))</pre> | n/a | yes |
 | deny\_internet\_outbound | Add a DenyInternetOutBound rule to every NSG, overriding Azure's default AllowInternetOutBound. | `bool` | `true` | no |
 | tags | Tags for the VNet and NSGs. azurerm has no provider default\_tags, so the caller passes them explicitly. | `map(string)` | `{}` | no |
 

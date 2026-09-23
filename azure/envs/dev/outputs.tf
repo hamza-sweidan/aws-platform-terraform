@@ -84,3 +84,43 @@ output "verify_commands" {
       && az network nsg delete -g ${azurerm_resource_group.hub.name} -n nsg-policy-test
   EOT
 }
+
+output "aks_cluster_name" {
+  description = "AKS cluster name, or null when enable_aks = false."
+  value       = one(module.aks[*].name)
+}
+
+output "aks_resource_group_name" {
+  description = "Resource group of the AKS cluster, registry and identities, or null."
+  value       = one(azurerm_resource_group.aks[*].name)
+}
+
+output "acr_name" {
+  description = "Private registry name, or null."
+  value       = one(module.acr[*].name)
+}
+
+output "acr_login_server" {
+  description = "Private registry login server, or null."
+  value       = one(module.acr[*].login_server)
+}
+
+output "aks_verify_commands" {
+  description = "az commands (bash) that check the AKS cluster and run the offline demo through az aks command invoke."
+  value = var.enable_aks ? join("\n", [
+    "# 1. Network isolated: no egress path, system images from the private ACR cache, private API",
+    "az aks show -g ${azurerm_resource_group.aks[0].name} -n ${module.aks[0].name} --query \"{outbound:networkProfile.outboundType, artifacts:bootstrapProfile.artifactSource, private:apiServerAccessProfile.enablePrivateCluster, localAccounts:disableLocalAccounts}\" -o table",
+    "",
+    "# 2. Nodes Ready with private IPs only (kubectl runs inside the cluster)",
+    "az aks command invoke -g ${azurerm_resource_group.aks[0].name} -n ${module.aks[0].name} --command \"kubectl get nodes -o wide\"",
+    "",
+    "# 3. Mirror the demo image into the private registry (ACR pulls it server-side)",
+    "az acr import --name ${module.acr[0].name} --source docker.io/nginxinc/nginx-unprivileged:1.30-alpine --image mirror/nginx-unprivileged:1.30-alpine",
+    "",
+    "# 4. Deploy the same manifests as the EKS demo, then prove there's no way out",
+    "export DEMO_IMAGE=${module.acr[0].login_server}/mirror/nginx-unprivileged:1.30-alpine",
+    "envsubst '$DEMO_IMAGE' < k8s/deployment.yaml > /tmp/deployment.yaml",
+    "az aks command invoke -g ${azurerm_resource_group.aks[0].name} -n ${module.aks[0].name} --file k8s/namespace.yaml --file /tmp/deployment.yaml --file k8s/service.yaml --file k8s/networkpolicy.yaml --command \"kubectl apply -f namespace.yaml && kubectl apply -f deployment.yaml -f service.yaml -f networkpolicy.yaml && kubectl -n offline-demo rollout status deploy/web --timeout=180s\"",
+    "az aks command invoke -g ${azurerm_resource_group.aks[0].name} -n ${module.aks[0].name} --command \"kubectl -n offline-demo exec deploy/web -- wget -qO- -T 5 http://web | grep -i title; kubectl -n offline-demo exec deploy/web -- wget -qO- -T 5 https://example.com || echo 'no internet egress (expected)'\"",
+  ]) : "Set enable_aks = true to create the cluster."
+}

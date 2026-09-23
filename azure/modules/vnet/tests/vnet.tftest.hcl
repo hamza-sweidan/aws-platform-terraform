@@ -91,6 +91,37 @@ run "caller_rules_map_to_the_right_fields" {
   }
 }
 
+run "local_side_can_include_a_pod_cidr" {
+  command = plan
+
+  variables {
+    subnets = {
+      nodes = {
+        address_prefix = "10.13.0.0/24"
+        nsg_rules = {
+          AllowClusterTrafficInBound = {
+            priority                = 100
+            direction               = "Inbound"
+            protocol                = "*"
+            remote_address_prefixes = ["10.13.0.0/24", "10.244.0.0/16"]
+            local_address_prefixes  = ["10.13.0.0/24", "10.244.0.0/16"]
+            destination_port_ranges = ["*"]
+          }
+        }
+      }
+    }
+  }
+
+  assert {
+    condition = anytrue([
+      for r in azurerm_network_security_group.this["nodes"].security_rule :
+      r.name == "AllowClusterTrafficInBound" &&
+      toset(r.destination_address_prefixes) == toset(["10.13.0.0/24", "10.244.0.0/16"])
+    ])
+    error_message = "local_address_prefixes must replace the subnet as the local side of the rule."
+  }
+}
+
 run "internet_deny_can_be_turned_off" {
   command = plan
 

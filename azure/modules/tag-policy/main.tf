@@ -48,23 +48,44 @@ resource "azurerm_policy_definition" "require_tags" {
   # keyword and would skip the whole file.
   policy_rule = jsonencode({
     "if" = {
-      count = {
-        value = "[parameters('tagNames')]"
-        name  = "tagName"
-        where = {
-          anyOf = [
-            {
-              field  = "[concat('tags[', current('tagName'), ']')]"
-              exists = "false"
-            },
-            {
-              field  = "[concat('tags[', current('tagName'), ']')]"
-              equals = ""
-            },
-          ]
-        }
-      }
-      greater = 0
+      allOf = [
+        {
+          count = {
+            value = "[parameters('tagNames')]"
+            name  = "tagName"
+            where = {
+              anyOf = [
+                {
+                  field  = "[concat('tags[', current('tagName'), ']')]"
+                  exists = "false"
+                },
+                {
+                  field  = "[concat('tags[', current('tagName'), ']')]"
+                  equals = ""
+                },
+              ]
+            }
+          }
+          greater = 0
+        },
+        # A private endpoint's network interface is created by the Network
+        # resource provider, untagged, and the caller can't tag it. Without
+        # this exemption the Deny would block every private endpoint.
+        {
+          not = {
+            allOf = [
+              {
+                field  = "type"
+                equals = "Microsoft.Network/networkInterfaces"
+              },
+              {
+                field  = "Microsoft.Network/networkInterfaces/privateEndpoint"
+                exists = "true"
+              },
+            ]
+          }
+        },
+      ]
     }
     "then" = {
       effect = "[parameters('effect')]"
