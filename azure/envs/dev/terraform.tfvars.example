@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+
+# az account show --query id -o tsv
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+owner = "your-github-handle"
+
+# location          = "germanywestcentral"
+# hub_address_space = "10.10.0.0/22"
+# spokes = {
+#   spoke1 = { address_space = "10.11.0.0/22" }
+#   spoke2 = { address_space = "10.12.0.0/22" }
+# }
+
+# Audit reports untagged resources without blocking them.
+# tag_policy_effect = "Deny"
