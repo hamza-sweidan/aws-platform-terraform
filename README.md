@@ -127,6 +127,11 @@ inputs and outputs (terraform-docs).
 | crane or skopeo | any recent | For `scripts/mirror-image.sh` |
 | bash + envsubst | | Git Bash on Windows has both |
 
+Commands in this README are bash (Git Bash on Windows). In **PowerShell**,
+quote any argument that contains a dot, e.g.
+`terraform init '-backend-config=backend.hcl'`. Unquoted, PowerShell splits
+it at the `.` and Terraform fails with *No positional arguments are expected*.
+
 ## 1. Bootstrap remote state (once per account)
 
 ```bash
