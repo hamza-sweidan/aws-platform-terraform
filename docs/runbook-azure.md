@@ -181,3 +181,25 @@ runner's IP through the state firewall, plans, and removes the IP again
 
 A job killed before its last step leaves its runner IP in the firewall. Clean
 up with `scripts/azure-state-firewall.sh reset` (keeps only your current IP).
+
+---
+
+## 9. AKS (`enable_aks = true`) fails to create or nodes stay NotReady
+
+The cluster is network-isolated ([ADR 0010](decisions/0010-network-isolated-private-aks.md)):
+every image comes through the private ACR, and nothing can reach the internet.
+
+```bash
+RG=rg-hubspoke-aks-dev AKS=aks-hubspoke-dev ACR=$(terraform -chdir=azure/envs/dev output -raw acr_name)
+az aks show -g $RG -n $AKS --query "{state:provisioningState, power:powerState.code, outbound:networkProfile.outboundType, artifacts:bootstrapProfile.artifactSource}" -o table
+```
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Apply fails with `QuotaExceeded` / `OperationNotAllowed ... cores` | The trial's regional vCPU quota (typically 4) can't fit the nodes, or an upgrade's surge node. | `az vm list-usage -l germanywestcentral -o table`. Use `aks_node_count = 1`, or request a quota increase. |
+| `RequestDisallowedByPolicy` on `nic-pe-acr...` | The tag policy denied the private endpoint's untagged NIC: the definition update with the private-endpoint exemption hadn't taken effect yet. | Re-run the apply after a few minutes. |
+| Cluster create fails, or nodes `NotReady` with image pull errors for `aks-managed-repository/...` | The cache rule is missing or changed, the ACR private endpoint or its DNS records are missing, or the kubelet identity lacks AcrPull. | `az acr cache show -r $ACR -n aks-managed-mcr`; `az network private-dns record-set a list -g $RG -z privatelink.azurecr.io -o table` (expect the registry and `<region>.data` records); `az role assignment list --scope $(az acr show -n $ACR --query id -o tsv) -o table`. |
+| `az aks command invoke` fails with `Forbidden` | Your identity lacks *Azure Kubernetes Service RBAC Cluster Admin* on the cluster (local accounts are off). | Add your object ID to `aks_admin_object_ids` (defaults to whoever ran Terraform) and apply. |
+| Pods on different nodes can't talk, or DNS times out | The node subnet NSG is missing the pod CIDR rules. Overlay pod-to-pod traffic keeps 10.244.x.x source IPs. | Check `AllowClusterTraffic{In,Out}Bound` on `nsg-hubspoke-aks-dev-nodes`. |
+| Workload `ImagePullBackOff` for a Docker Hub image | Expected: there's no egress. | `az acr import --name $ACR --source docker.io/<image>:<tag> --image mirror/<name>:<tag>` and deploy from `$ACR.azurecr.io`. |
+| `terraform destroy` leaves `rg-hubspoke-aks-nodes-dev` behind for a while | AKS deletes its node resource group asynchronously. | Wait. If it's still there after ~15 minutes: `az group delete -n rg-hubspoke-aks-nodes-dev`. |
