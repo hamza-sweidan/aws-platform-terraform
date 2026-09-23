@@ -1,7 +1,7 @@
 # 0009. Pull request plans with OIDC and read-only identities
 
 - **Status:** Accepted
-- **Date:** 2026-09-23
+- **Date:** 2026-09-23 (trust amended 2026-09-24 for immutable subjects)
 
 ## Context
 
@@ -27,7 +27,7 @@ world-readable.
 | | AWS | Azure |
 |---|---|---|
 | Identity | IAM role `aws-platform-github-plan` + GitHub OIDC provider (`bootstrap/github_oidc.tf`) | User-assigned managed identity + federated credential (`azure/bootstrap/github_oidc.tf`) |
-| Trust | `sub` = `repo:<owner>/<repo>:pull_request`, `aud` = `sts.amazonaws.com`, StringEquals | Same subject, audience `api://AzureADTokenExchange` |
+| Trust | `sub` = `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request`, `aud` = `sts.amazonaws.com`, StringEquals | Same subject, audience `api://AzureADTokenExchange` |
 | Read | `ReadOnlyAccess`, minus object reads outside the state bucket (explicit Deny) | Reader on the subscription, Storage Blob Data Reader on the state container |
 | Write | Explicit Deny on state writes | Custom role: `storageAccounts/read` + `write` on the state account only (for the firewall, below) |
 
@@ -35,6 +35,11 @@ Choices:
 
 - **`-lock=false`.** A plan is speculative, so the identities never take the
   state lock and never need write access to state.
+- **Immutable subject.** GitHub puts the owner and repository IDs in the `sub`
+  claim (the default for repositories created after 2026-07-15). Both trusts
+  match that exact subject, built from `github_repository` and
+  `github_repository_ids`. A name can be recycled after a rename or deletion;
+  the IDs can't, so a new repository that reuses the name gets no token.
 - **Managed identity, not an app registration, on Azure.** It lives in the
   subscription next to the state and needs no Entra directory permissions to
   create.
@@ -68,7 +73,7 @@ Choices:
   to this repository can use the plan identities' read access. That's
   acceptable for a single-owner repository. With collaborators, use a
   protected environment with required reviewers, and bind the trust to the
-  environment (`sub` = `repo:<owner>/<repo>:environment:<name>`) instead of
+  environment (`sub` = `repo:<owner>@<id>/<repo>@<id>:environment:<name>`) instead of
   `pull_request`.
 - `ReadOnlyAccess` is broad (it can describe everything). The explicit Deny
   removes the part that matters most, reading S3 objects. A hand-written

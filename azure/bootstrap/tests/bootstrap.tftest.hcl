@@ -88,12 +88,13 @@ run "ci_identity_trusts_only_this_repos_pull_requests" {
   command = apply
 
   variables {
-    github_repository = "hamza-sweidan/aws-platform-terraform"
+    github_repository     = "hamza-sweidan/aws-platform-terraform"
+    github_repository_ids = { owner = 210244091, repository = 1383148050 }
   }
 
   assert {
     condition = (
-      azurerm_federated_identity_credential.github_pull_request[0].subject == "repo:hamza-sweidan/aws-platform-terraform:pull_request" &&
+      azurerm_federated_identity_credential.github_pull_request[0].subject == "repo:hamza-sweidan@210244091/aws-platform-terraform@1383148050:pull_request" &&
       azurerm_federated_identity_credential.github_pull_request[0].issuer == "https://token.actions.githubusercontent.com" &&
       toset(azurerm_federated_identity_credential.github_pull_request[0].audience) == toset(["api://AzureADTokenExchange"])
     )
@@ -116,6 +117,18 @@ run "ci_identity_trusts_only_this_repos_pull_requests" {
     ]) && toset(azurerm_role_definition.state_firewall_operator[0].assignable_scopes) == toset([azurerm_storage_account.state.id])
     error_message = "The firewall role must be limited to the state account."
   }
+}
+
+# A name-only subject would also match a repository that later reuses the name.
+run "ci_identity_requires_immutable_ids" {
+  command = plan
+
+  variables {
+    github_repository     = "hamza-sweidan/aws-platform-terraform"
+    github_repository_ids = null
+  }
+
+  expect_failures = [var.github_repository_ids]
 }
 
 run "rejects_unknown_guardrail_effect" {

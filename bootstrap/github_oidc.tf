@@ -5,6 +5,15 @@
 
 locals {
   github_oidc_enabled = var.github_repository != null
+
+  # GitHub's immutable subject: repo:OWNER@OWNER_ID/NAME@REPO_ID:pull_request.
+  # Names can be taken over after a rename or deletion; the IDs can't, so a
+  # new repository that reuses this name presents a different subject.
+  github_plan_subject = local.github_oidc_enabled ? format(
+    "repo:%s@%d/%s@%d:pull_request",
+    split("/", var.github_repository)[0], var.github_repository_ids.owner,
+    split("/", var.github_repository)[1], var.github_repository_ids.repository,
+  ) : null
 }
 
 # One per account per issuer URL. AWS validates GitHub's certificate chain
@@ -39,7 +48,7 @@ data "aws_iam_policy_document" "github_plan_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:pull_request"]
+      values   = [local.github_plan_subject]
     }
   }
 }

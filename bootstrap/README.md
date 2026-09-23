@@ -16,7 +16,7 @@ state, because it creates the backend everything else uses.
 | Lifecycle rule | Expires old versions (including leftover `.tflock` versions) and aborts stuck multipart uploads. |
 | `prevent_destroy` | `terraform destroy` fails instead of orphaning every environment's state. |
 | AWS Budget (optional) | Emails at 50/80/100% actual and 100% forecast spend. Tracks gross cost, so credits don't hide it. |
-| GitHub OIDC provider + `aws-platform-github-plan` role (optional, `github_repository`) | Read-only role for pull request plans. Trusts only `repo:<owner>/<repo>:pull_request` tokens; `ReadOnlyAccess` with explicit Denies on object reads outside the state bucket and on state writes. See [ADR 0009](../docs/decisions/0009-pull-request-plans-with-oidc.md). |
+| GitHub OIDC provider + `aws-platform-github-plan` role (optional, `github_repository`) | Read-only role for pull request plans. Trusts only `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request` tokens (GitHub's immutable subject, `github_repository_ids`); `ReadOnlyAccess` with explicit Denies on object reads outside the state bucket and on state writes. See [ADR 0009](../docs/decisions/0009-pull-request-plans-with-oidc.md). |
 
 Locking uses **S3 native lock files** (`use_lockfile = true` in the consumers'
 backend block). See [ADR 0002](../docs/decisions/0002-s3-native-state-locking.md).
@@ -80,6 +80,7 @@ and the same for the other resources.
 | owner | Value for the Owner tag, e.g. your GitHub handle. | `string` | n/a | yes |
 | budget\_alert\_email | Email address for budget alerts. Leave null to skip creating the budget. | `string` | `null` | no |
 | github\_repository | GitHub repository (owner/name) whose pull\_request workflows may assume the read-only plan role. Leave null to create no OIDC provider or role. | `string` | `null` | no |
+| github\_repository\_ids | Immutable IDs of github\_repository, which GitHub puts in the OIDC subject (repo:owner@ID/name@ID). Look them up with: gh api repos/OWNER/NAME --jq '{owner: .owner.id, repository: .id}' | <pre>object({<br/>    owner      = number<br/>    repository = number<br/>  })</pre> | `null` | no |
 | monthly\_budget\_usd | Monthly AWS cost budget in USD. Alerts fire at 50/80/100% actual and 100% forecast. | `number` | `120` | no |
 | noncurrent\_version\_retention\_days | Days to keep old state versions before S3 deletes them. Old versions are your undo button for a bad apply. | `number` | `90` | no |
 | project | Short project name. Used in the bucket name and the Project tag. | `string` | `"aws-platform"` | no |
