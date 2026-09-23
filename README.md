@@ -292,8 +292,10 @@ stored secret key ([ADR 0009](docs/decisions/0009-pull-request-plans-with-oidc.m
   of the job. Two built-in Deny policies keep that write from weakening the
   account.
 
-Both jobs stay off until the identities exist. One-time setup, after
-applying both bootstraps with `github_repository` set:
+Each job stays off until its identity exists and its `*_PLAN_ENABLED`
+variable is `true`. The Azure job is on; the AWS job waits for `bootstrap/`
+to be applied. One-time setup, after applying a bootstrap with
+`github_repository` set:
 
 ```bash
 gh variable set OWNER --body "<your-github-handle>"
