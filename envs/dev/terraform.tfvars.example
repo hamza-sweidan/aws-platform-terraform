@@ -8,6 +8,8 @@ cluster_admin_principal_arns = ["arn:aws:iam::111122223333:user/your-user"]
 # availability_zones = ["eu-central-1a", "eu-central-1b"]
 # node_capacity_type = "SPOT"
 # node_instance_types = ["t3.medium", "t3a.medium"]
+# AWS free-plan account: t3.medium isn't Free Tier-eligible, so use
+# node_instance_types = ["c7i-flex.large"]
 
 # Needed to run kubectl against the private API (adds ~$0.08/h).
 enable_bastion = true

@@ -77,7 +77,7 @@ azure/
     aks/              network-isolated private AKS (Phase 3)
   envs/dev/           hub + two spokes + peering + policy; traffic matrix
 scripts/azure-state-firewall.sh   allow your current IP through the state firewall
-docs/decisions/0005-0008   Azure ADRs
+docs/decisions/0005-0008, 0010  Azure ADRs
 docs/runbook-azure.md      Azure failure diagnosis
 ```
 

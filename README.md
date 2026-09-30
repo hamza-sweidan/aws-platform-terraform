@@ -108,7 +108,7 @@ scripts/             mirror-image.sh: public image -> private ECR (crane or skop
                      azure-state-firewall.sh: allow your current IP through the Azure state firewall
 k8s/                 sample workload that runs from the mirrored ECR digest
 azure/               phase 2: Azure hub-and-spoke (own bootstrap, modules, envs/dev)
-docs/decisions/      ADRs (0001-0004 AWS, 0005-0008 Azure)
+docs/decisions/      ADRs (0001-0004 AWS, 0005-0008 Azure, 0009 CI plans, 0010 AKS)
 docs/runbook.md      failure diagnosis (AWS)
 docs/runbook-azure.md failure diagnosis (Azure)
 ```
@@ -154,6 +154,10 @@ terraform apply tfplan                          # ~15-20 min; the EKS control pl
 ```
 
 Your IAM ARN comes from `aws sts get-caller-identity --query Arn --output text`.
+
+On an AWS **free-plan** account, set `node_instance_types = ["c7i-flex.large"]`
+before you plan. The default `t3.medium` isn't Free Tier-eligible, so the node
+group fails to create ([runbook §7](docs/runbook.md#7-node-group-fails-on-an-aws-free-plan-account)).
 
 ## 3. Verify
 
@@ -364,4 +368,4 @@ pip install pre-commit && pre-commit install
 two spoke VNets peered to it, one default-deny NSG per subnet, and a custom
 Azure Policy that denies resources missing the required tags. It has its own
 bootstrap (Entra ID-only Blob Storage state), modules, environment, ADRs
-0005-0008 and [runbook](docs/runbook-azure.md).
+0005-0008 and 0010, and a [runbook](docs/runbook-azure.md).
