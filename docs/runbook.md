@@ -174,3 +174,40 @@ through GitHub OIDC ([ADR 0009](decisions/0009-pull-request-plans-with-oidc.md))
 | `No OpenIDConnect provider found in your account` | `bootstrap` was applied without `github_repository`. | Set it and apply `bootstrap`. |
 | `Credentials could not be loaded` / `id-token` errors | The job lacks `permissions: id-token: write`. | Keep the job-level permissions block. |
 | `AccessDenied` on `s3:GetObject` for the state key | The `AWS_STATE_BUCKET` secret names a different bucket than the one the Deny statement exempts. | `terraform -chdir=bootstrap output -raw state_bucket_name` and update the secret. |
+
+---
+
+## 7. Node group fails on an AWS free-plan account
+
+**Symptoms.** On an account that's on the AWS free plan, the node group fails
+within minutes, not after the 20-minute join timeout in §1. No instance ever
+starts, and the Auto Scaling activity says the instance type isn't eligible
+for the Free Tier.
+
+**Why it happens here.** A free-plan account can only launch Free
+Tier-eligible instance types, and the default `t3.medium` isn't one. For
+accounts created on or after 15 July 2025 the eligible types are `t3.micro`,
+`t3.small`, `t4g.micro`, `t4g.small`, `c7i-flex.large` and `m7i-flex.large`.
+The `t4g` types are Graviton, so they don't match the default
+`AL2023_x86_64_STANDARD` AMI.
+
+**Diagnose.**
+
+```bash
+# Why the Auto Scaling group couldn't launch a node
+ASG=$(aws eks describe-nodegroup --region $REGION --cluster-name $CLUSTER \
+  --nodegroup-name "$(aws eks list-nodegroups --region $REGION --cluster-name $CLUSTER --query 'nodegroups[0]' --output text)" \
+  --query 'nodegroup.resources.autoScalingGroups[0].name' --output text)
+aws autoscaling describe-scaling-activities --region $REGION --auto-scaling-group-name "$ASG" \
+  --max-items 3 --query 'Activities[].StatusMessage' --output text
+
+# Which types this account may launch for free
+aws ec2 describe-instance-types --region $REGION --filters Name=free-tier-eligible,Values=true \
+  --query 'InstanceTypes[].InstanceType' --output text
+```
+
+**Fix.** Set `node_instance_types = ["c7i-flex.large"]` in
+`envs/dev/terraform.tfvars` and apply. It has 2 vCPUs and 4 GiB, the same as
+`t3.medium`. Changing the instance type replaces the node group. The other
+option is to upgrade the account to the paid plan. The bastion's default
+`t3.micro` is already eligible.

@@ -155,6 +155,10 @@ terraform apply tfplan                          # ~15-20 min; the EKS control pl
 
 Your IAM ARN comes from `aws sts get-caller-identity --query Arn --output text`.
 
+On an AWS **free-plan** account, set `node_instance_types = ["c7i-flex.large"]`
+before you plan. The default `t3.medium` isn't Free Tier-eligible, so the node
+group fails to create ([runbook §7](docs/runbook.md#7-node-group-fails-on-an-aws-free-plan-account)).
+
 ## 3. Verify
 
 Terminal 1: open the tunnel (stays in the foreground):
